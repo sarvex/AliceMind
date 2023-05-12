@@ -138,7 +138,7 @@ class TFBertEmbeddings(tf.keras.layers.Layer):
         elif mode == "linear":
             return self._linear(inputs)
         else:
-            raise ValueError("mode {} is not valid.".format(mode))
+            raise ValueError(f"mode {mode} is not valid.")
 
     def _embedding(self, inputs, training=False):
         """Applies embedding based on inputs tensor."""
@@ -243,8 +243,11 @@ class TFBertSelfAttention(tf.keras.layers.Layer):
         context_layer = tf.reshape(context_layer, 
                                   (batch_size, -1, self.all_head_size))  # (batch_size, seq_len_q, all_head_size)
 
-        outputs = (context_layer, attention_probs) if self.output_attentions else (context_layer,)
-        return outputs
+        return (
+            (context_layer, attention_probs)
+            if self.output_attentions
+            else (context_layer,)
+        )
 
 
 class TFBertSelfOutput(tf.keras.layers.Layer):
@@ -279,8 +282,7 @@ class TFBertAttention(tf.keras.layers.Layer):
 
         self_outputs = self.self_attention([input_tensor, attention_mask, head_mask], training=training)
         attention_output = self.dense_output([self_outputs[0], input_tensor], training=training)
-        outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
-        return outputs
+        return (attention_output,) + self_outputs[1:]
 
 
 class TFBertIntermediate(tf.keras.layers.Layer):
@@ -332,8 +334,7 @@ class TFBertLayer(tf.keras.layers.Layer):
         attention_output = attention_outputs[0]
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.bert_output([intermediate_output, attention_output], training=training)
-        outputs = (layer_output,) + attention_outputs[1:]  # add attentions if we output them
-        return outputs
+        return (layer_output,) + attention_outputs[1:]
 
 
 class TFBertEncoder(tf.keras.layers.Layer):
@@ -341,7 +342,10 @@ class TFBertEncoder(tf.keras.layers.Layer):
         super(TFBertEncoder, self).__init__(**kwargs)
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
-        self.layer = [TFBertLayer(config, name='layer_._{}'.format(i)) for i in range(config.num_hidden_layers)]
+        self.layer = [
+            TFBertLayer(config, name=f'layer_._{i}')
+            for i in range(config.num_hidden_layers)
+        ]
 
     def call(self, inputs, training=False):
         hidden_states, attention_mask, head_mask = inputs
@@ -382,8 +386,7 @@ class TFBertPooler(tf.keras.layers.Layer):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
-        pooled_output = self.dense(first_token_tensor)
-        return pooled_output
+        return self.dense(first_token_tensor)
 
 
 class TFBertPredictionHeadTransform(tf.keras.layers.Layer):
@@ -435,8 +438,7 @@ class TFBertMLMHead(tf.keras.layers.Layer):
         self.predictions = TFBertLMPredictionHead(config, input_embeddings, name='predictions')
 
     def call(self, sequence_output):
-        prediction_scores = self.predictions(sequence_output)
-        return prediction_scores
+        return self.predictions(sequence_output)
 
 
 class TFBertNSPHead(tf.keras.layers.Layer):
@@ -447,8 +449,7 @@ class TFBertNSPHead(tf.keras.layers.Layer):
                                                       name='seq_relationship')
 
     def call(self, pooled_output):
-        seq_relationship_score = self.seq_relationship(pooled_output)
-        return seq_relationship_score
+        return self.seq_relationship(pooled_output)
 
 
 class TFBertMainLayer(tf.keras.layers.Layer):
@@ -514,7 +515,7 @@ class TFBertMainLayer(tf.keras.layers.Layer):
         # attention_probs has shape bsz x n_heads x N x N
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
-        if not head_mask is None:
+        if head_mask is not None:
             raise NotImplementedError
         else:
             head_mask = [None] * self.num_hidden_layers
@@ -526,8 +527,7 @@ class TFBertMainLayer(tf.keras.layers.Layer):
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
 
-        outputs = (sequence_output, pooled_output,) + encoder_outputs[1:]  # add hidden_states and attentions if they are here
-        return outputs  # sequence_output, pooled_output, (hidden_states), (attentions)
+        return (sequence_output, pooled_output,) + encoder_outputs[1:]
 
 
 class TFBertPreTrainedModel(TFPreTrainedModel):
@@ -657,8 +657,7 @@ class TFBertModel(TFBertPreTrainedModel):
         self.bert = TFBertMainLayer(config, name='bert')
 
     def call(self, inputs, **kwargs):
-        outputs = self.bert(inputs, **kwargs)
-        return outputs
+        return self.bert(inputs, **kwargs)
 
 
 @add_start_docstrings("""Bert Model with two heads on top as done during the pre-training:

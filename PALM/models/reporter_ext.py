@@ -21,9 +21,9 @@ def build_report_manager(opt):
     else:
         writer = None
 
-    report_mgr = ReportMgr(opt.report_every, start_time=-1,
-                           tensorboard_writer=writer)
-    return report_mgr
+    return ReportMgr(
+        opt.report_every, start_time=-1, tensorboard_writer=writer
+    )
 
 
 class ReportMgrBase(object):
@@ -232,9 +232,7 @@ class Statistics(object):
 
     def xent(self):
         """ compute cross entropy """
-        if (self.n_docs == 0):
-            return 0
-        return self.loss / self.n_docs
+        return 0 if (self.n_docs == 0) else self.loss / self.n_docs
 
     def elapsed_time(self):
         """ compute elapsed time """
@@ -265,5 +263,5 @@ class Statistics(object):
     def log_tensorboard(self, prefix, writer, learning_rate, step):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
-        writer.add_scalar(prefix + "/xent", self.xent(), step)
-        writer.add_scalar(prefix + "/lr", learning_rate, step)
+        writer.add_scalar(f"{prefix}/xent", self.xent(), step)
+        writer.add_scalar(f"{prefix}/lr", learning_rate, step)

@@ -14,8 +14,7 @@ from others.utils import test_rouge, rouge_results_to_str
 
 
 def _tally_parameters(model):
-    n_params = sum([p.nelement() for p in model.parameters()])
-    return n_params
+    return sum(p.nelement() for p in model.parameters())
 
 
 def convert_instance_to_feature_hdf5(example):
@@ -23,14 +22,7 @@ def convert_instance_to_feature_hdf5(example):
     input_x2 = example[1]
 
 
-    feature = dict()
-    feature['input_x1'] = input_x1
-    feature['input_x2'] = input_x2
-    # Roberta
-    #feature['eos_index'] = [2, 1]
-    # Bert
-    feature['eos_index'] = [102, 0]
-    return feature
+    return {'input_x1': input_x1, 'input_x2': input_x2, 'eos_index': [102, 0]}
 class HDF5Dataset(Dataset):
     """HDF5 dataset"""
 
@@ -454,7 +446,7 @@ class Trainer(object):
             'optims': self.optims,
         }
         checkpoint_path = os.path.join(self.args.model_path, 'model_step_%d.pt' % step)
-        logger.info("Saving checkpoint %s" % checkpoint_path)
+        logger.info(f"Saving checkpoint {checkpoint_path}")
         # checkpoint_path = '%s_step_%d.pt' % (FLAGS.model_path, step)
         if (not os.path.exists(checkpoint_path)):
             torch.save(checkpoint, checkpoint_path)

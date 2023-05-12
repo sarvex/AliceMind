@@ -90,7 +90,9 @@ MODEL_CLASSES = {
 
 def convert_pt_checkpoint_to_tf(model_type, pytorch_checkpoint_path, config_file, tf_dump_path, compare_with_pt_model=False, use_cached_models=True):
     if model_type not in MODEL_CLASSES:
-        raise ValueError("Unrecognized model type, should be one of {}.".format(list(MODEL_CLASSES.keys())))
+        raise ValueError(
+            f"Unrecognized model type, should be one of {list(MODEL_CLASSES.keys())}."
+        )
 
     config_class, model_class, pt_model_class, aws_model_maps, aws_config_map = MODEL_CLASSES[model_type]
 
@@ -100,7 +102,7 @@ def convert_pt_checkpoint_to_tf(model_type, pytorch_checkpoint_path, config_file
     config = config_class.from_json_file(config_file)
     config.output_hidden_states = True
     config.output_attentions = True
-    print("Building TensorFlow model from configuration: {}".format(str(config)))
+    print(f"Building TensorFlow model from configuration: {str(config)}")
     tf_model = model_class(config)
 
     # Load weights from tf checkpoint
@@ -125,11 +127,11 @@ def convert_pt_checkpoint_to_tf(model_type, pytorch_checkpoint_path, config_file
         np_pt = pto[0].detach().numpy()
         np_tf = tfo[0].numpy()
         diff = np.amax(np.abs(np_pt - np_tf))
-        print("Max absolute difference between models outputs {}".format(diff))
+        print(f"Max absolute difference between models outputs {diff}")
         assert diff <= 2e-2, "Error, model absolute difference is >2e-2"
 
     # Save pytorch-model
-    print("Save TensorFlow model to {}".format(tf_dump_path))
+    print(f"Save TensorFlow model to {tf_dump_path}")
     tf_model.save_weights(tf_dump_path, save_format='h5')
 
 
@@ -144,10 +146,12 @@ def convert_all_pt_checkpoints_to_tf(args_model_type, tf_dump_path, model_shortc
 
     for j, model_type in enumerate(model_types, start=1):
         print("=" * 100)
-        print(" Converting model type {}/{}: {}".format(j, len(model_types), model_type))
+        print(f" Converting model type {j}/{len(model_types)}: {model_type}")
         print("=" * 100)
         if model_type not in MODEL_CLASSES:
-            raise ValueError("Unrecognized model type {}, should be one of {}.".format(model_type, list(MODEL_CLASSES.keys())))
+            raise ValueError(
+                f"Unrecognized model type {model_type}, should be one of {list(MODEL_CLASSES.keys())}."
+            )
 
         config_class, model_class, pt_model_class, aws_model_maps, aws_config_map = MODEL_CLASSES[model_type]
 
@@ -161,13 +165,15 @@ def convert_all_pt_checkpoints_to_tf(args_model_type, tf_dump_path, model_shortc
             print("-" * 100)
             if '-squad' in model_shortcut_name or '-mrpc' in model_shortcut_name or '-mnli' in model_shortcut_name:
                 if not only_convert_finetuned_models:
-                    print("    Skipping finetuned checkpoint {}".format(model_shortcut_name))
+                    print(f"    Skipping finetuned checkpoint {model_shortcut_name}")
                     continue
                 model_type = model_shortcut_name
             elif only_convert_finetuned_models:
-                print("    Skipping not finetuned checkpoint {}".format(model_shortcut_name))
+                print(f"    Skipping not finetuned checkpoint {model_shortcut_name}")
                 continue
-            print("    Converting checkpoint {}/{}: {} - model_type {}".format(i, len(aws_config_map), model_shortcut_name, model_type))
+            print(
+                f"    Converting checkpoint {i}/{len(aws_config_map)}: {model_shortcut_name} - model_type {model_type}"
+            )
             print("-" * 100)
 
             if config_shortcut_name in aws_config_map:
@@ -182,11 +188,15 @@ def convert_all_pt_checkpoints_to_tf(args_model_type, tf_dump_path, model_shortc
 
             if os.path.isfile(model_shortcut_name):
                 model_shortcut_name = 'converted_model'
-            convert_pt_checkpoint_to_tf(model_type=model_type,
-                                        pytorch_checkpoint_path=model_file,
-                                        config_file=config_file,
-                                        tf_dump_path=os.path.join(tf_dump_path, model_shortcut_name + '-tf_model.h5'),
-                                        compare_with_pt_model=compare_with_pt_model)
+            convert_pt_checkpoint_to_tf(
+                model_type=model_type,
+                pytorch_checkpoint_path=model_file,
+                config_file=config_file,
+                tf_dump_path=os.path.join(
+                    tf_dump_path, f'{model_shortcut_name}-tf_model.h5'
+                ),
+                compare_with_pt_model=compare_with_pt_model,
+            )
             os.remove(config_file)
             os.remove(model_file)
 
@@ -199,10 +209,12 @@ if __name__ == "__main__":
                         type = str,
                         required = True,
                         help = "Path to the output Tensorflow dump file.")
-    parser.add_argument("--model_type",
-                        default = None,
-                        type = str,
-                        help = "Model type selected in the list of {}. If not given, will download and convert all the models from AWS.".format(list(MODEL_CLASSES.keys())))
+    parser.add_argument(
+        "--model_type",
+        default=None,
+        type=str,
+        help=f"Model type selected in the list of {list(MODEL_CLASSES.keys())}. If not given, will download and convert all the models from AWS.",
+    )
     parser.add_argument("--pytorch_checkpoint_path",
                         default = None,
                         type = str,

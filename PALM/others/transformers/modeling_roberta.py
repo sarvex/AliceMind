@@ -532,18 +532,16 @@ class RobertaForCoQAOri(BertPreTrainedModel):
             ignored_index = start_logits.size(1)
             start_positions.clamp_(0, ignored_index)
             end_positions.clamp_(0, ignored_index)
-            
+
             #softmax_logits = Softmax()
             span_loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
             cls_loss_fct = CrossEntropyLoss()
-            
+
             #start_logits = softmax_logits(torch.cat((start_logits, cls_logits))) 
             start_loss = span_loss_fct(start_logits, start_positions)
             end_loss = span_loss_fct(end_logits, end_positions)
             cls_loss = cls_loss_fct(cls_logits, cls_idx)
-            total_loss = (start_loss +
-                          end_loss) / 2 + self.cls_alpha * cls_loss
-            return total_loss
+            return (start_loss + end_loss) / 2 + self.cls_alpha * cls_loss
         elif self.output_attentions:
             return all_attentions, start_logits, end_logits, cls_logits
         return start_logits, end_logits, cls_logits
@@ -615,7 +613,7 @@ class RobertaForCoQA(BertPreTrainedModel):
             ignored_index = start_logits.size(1)
             start_positions.clamp_(0, ignored_index)
             end_positions.clamp_(0, ignored_index)
-            
+
             #softmax_logits = Softmax()
             seq_length = input_ids.size(1)
             input_mask0 = attention_mask.type(torch.FloatTensor)
@@ -640,14 +638,13 @@ class RobertaForCoQA(BertPreTrainedModel):
             start_log_norm = torch.logsumexp(new_start_logits, axis=1)
             start_log_score = torch.logsumexp(new_start_logits + VERY_NEGATIVE_NUMBER * (1 - new_start_masks.type(torch.FloatTensor)), 1)
             start_loss = torch.mean(-(start_log_score - start_log_norm))
-            
+
             end_log_norm = torch.logsumexp(new_end_logits, axis=1)
             end_log_score = torch.logsumexp(new_end_logits + VERY_NEGATIVE_NUMBER * (1 - new_end_masks.type(torch.FloatTensor)), 1)
             end_loss = torch.mean(-(end_log_score - end_log_norm))
-            
-            
-            total_loss = (start_loss + end_loss) / 2
-            return total_loss
+
+
+            return (start_loss + end_loss) / 2
         elif self.output_attentions:
             return all_attentions, start_logits, end_logits, cls_logits
         return start_logits, end_logits, cls_logits

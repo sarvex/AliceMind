@@ -45,9 +45,7 @@ def positional_encoding(position, d_model_size):
     sines = np.sin(angle_rads[:, 0::2])
     cosines = np.cos(angle_rads[:, 1::2])
 
-    # pos_encoding = tf.cast(np.concatenate([sines, cosines], axis=-1)[np.newaxis, ...], dtype=tf.float32)
-    pos_encoding = tf.cast(np.concatenate([sines, cosines], axis=-1), dtype=tf.float32)
-    return pos_encoding
+    return tf.cast(np.concatenate([sines, cosines], axis=-1), dtype=tf.float32)
 
 def scaled_dot_product_attention(q, k, v, mask, attention_mask=None, head_mask=None):
     # calculate attention
@@ -160,8 +158,7 @@ class TFEncoderLayer(tf.keras.layers.Layer):
         ffn_output = self.dropout2(ffn_output, training=training)
         out2 = out1 + ffn_output
 
-        outputs = (out2,) + attn_outputs[1:]
-        return outputs
+        return (out2,) + attn_outputs[1:]
 
 
 class TFCTRLMainLayer(tf.keras.layers.Layer):
@@ -183,13 +180,18 @@ class TFCTRLMainLayer(tf.keras.layers.Layer):
                                     name="w")
 
         self.dropout = tf.keras.layers.Dropout(config.embd_pdrop)
-        self.h = [TFEncoderLayer(config.n_embd,
-                                 config.n_head,
-                                 config.dff,
-                                 config.resid_pdrop,
-                                 config.layer_norm_epsilon,
-                                 config.output_attentions,
-                                 name='h_._{}'.format(i)) for i in range(config.n_layer)]
+        self.h = [
+            TFEncoderLayer(
+                config.n_embd,
+                config.n_head,
+                config.dff,
+                config.resid_pdrop,
+                config.layer_norm_epsilon,
+                config.output_attentions,
+                name=f'h_._{i}',
+            )
+            for i in range(config.n_layer)
+        ]
         self.layernorm = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_epsilon, name="layernorm")
 
     def _resize_token_embeddings(self, new_num_tokens):
@@ -412,8 +414,7 @@ class TFCTRLModel(TFCTRLPreTrainedModel):
         self.transformer = TFCTRLMainLayer(config, name='transformer')
 
     def call(self, inputs, **kwargs):
-        outputs = self.transformer(inputs, **kwargs)
-        return outputs
+        return self.transformer(inputs, **kwargs)
 
 
 class TFCTRLLMHead(tf.keras.layers.Layer):
@@ -482,6 +483,4 @@ class TFCTRLLMHeadModel(TFCTRLPreTrainedModel):
 
         lm_logits = self.lm_head(hidden_states)
 
-        outputs = (lm_logits,) + transformer_outputs[1:]
-
-        return outputs  # lm_logits, presents, (all hidden_states), (attentions)
+        return (lm_logits,) + transformer_outputs[1:]

@@ -161,7 +161,7 @@ def create_optimizer(loss, init_lr, beta1, beta2, epsilon,
           m = re.search(r"bert/encoder/layer_(\d+?)/", tvars[i].name)
           if not m:
             continue
-          n_layer = max(n_layer, int(m.group(1)) + 1)
+          n_layer = max(n_layer, int(m[1]) + 1)
 
         for i in range(len(clipped_grads)):
           for layer in range(n_layer):
@@ -207,7 +207,7 @@ def create_optimizer(loss, init_lr, beta1, beta2, epsilon,
         m = re.search(r"bert/encoder/layer_(\d+?)/", tvars[i].name)
         if not m:
           continue
-        n_layer = max(n_layer, int(m.group(1)) + 1)
+        n_layer = max(n_layer, int(m[1]) + 1)
 
       for i in range(len(clipped_grads)):
         for layer in range(n_layer):
@@ -259,25 +259,28 @@ class AdamWeightDecayOptimizer(tf.compat.v1.train.Optimizer):
       has_shadow = manual_fp16 and param.dtype.base_dtype != tf.float32
       if has_shadow:
         param_fp32 = tf.compat.v1.get_variable(
-            name=param_name + "/shadow",
+            name=f"{param_name}/shadow",
             dtype=tf.float32,
             trainable=False,
-            initializer=tf.cast(param.initialized_value(), tf.float32))
+            initializer=tf.cast(param.initialized_value(), tf.float32),
+        )
       else:
         param_fp32 = param
 
       m = tf.compat.v1.get_variable(
-          name=param_name + "/adam_m",
+          name=f"{param_name}/adam_m",
           shape=param.shape.as_list(),
           dtype=tf.float32,
           trainable=False,
-          initializer=tf.zeros_initializer())
+          initializer=tf.zeros_initializer(),
+      )
       v = tf.compat.v1.get_variable(
-          name=param_name + "/adam_v",
+          name=f"{param_name}/adam_v",
           shape=param.shape.as_list(),
           dtype=tf.float32,
           trainable=False,
-          initializer=tf.zeros_initializer())
+          initializer=tf.zeros_initializer(),
+      )
 
       # Standard Adam update.
       next_m = (
@@ -330,7 +333,7 @@ class AdamWeightDecayOptimizer(tf.compat.v1.train.Optimizer):
     """Get the variable name from the tensor name."""
     m = re.match("^(.*):\\d+$", param_name)
     if m is not None:
-      param_name = m.group(1)
+      param_name = m[1]
     return param_name
 
 
@@ -362,15 +365,12 @@ class AdamWeightDecayOptimizerV2(tf.compat.v1.train.Optimizer):
     """Get the variable name from the tensor name."""
     m = re.match("^(.*):\\d+$", param_name)
     if m is not None:
-      param_name = m.group(1)
+      param_name = m[1]
     return param_name
 
   def _get_beta_accumulators(self):
     with ops.init_scope():
-      if context.executing_eagerly():
-        graph = None
-      else:
-        graph = ops.get_default_graph()
+      graph = None if context.executing_eagerly() else ops.get_default_graph()
       return (self._get_non_slot_variable("beta1_power", graph=graph),
               self._get_non_slot_variable("beta2_power", graph=graph))
 
@@ -409,10 +409,11 @@ class AdamWeightDecayOptimizerV2(tf.compat.v1.train.Optimizer):
     has_shadow = self.manual_fp16 and var.dtype.base_dtype != tf.float32
     if has_shadow:
       var_fp32 = tf.compat.v1.get_variable(
-        name=var_name + "/shadow",
-        dtype=tf.float32,
-        trainable=False,
-        initializer=tf.cast(var.initialized_value(), tf.float32))
+          name=f"{var_name}/shadow",
+          dtype=tf.float32,
+          trainable=False,
+          initializer=tf.cast(var.initialized_value(), tf.float32),
+      )
     else:
       var_fp32 = var
 
@@ -460,10 +461,11 @@ class AdamWeightDecayOptimizerV2(tf.compat.v1.train.Optimizer):
     has_shadow = self.manual_fp16 and var.dtype.base_dtype != tf.float32
     if has_shadow:
       var_fp32 = tf.compat.v1.get_variable(
-        name=var_name + "/shadow",
-        dtype=tf.float32,
-        trainable=False,
-        initializer=tf.cast(var.initialized_value(), tf.float32))
+          name=f"{var_name}/shadow",
+          dtype=tf.float32,
+          trainable=False,
+          initializer=tf.cast(var.initialized_value(), tf.float32),
+      )
     else:
       var_fp32 = var
 
@@ -610,25 +612,28 @@ class LAMBOptimizer(tf.compat.v1.train.Optimizer):
       if has_shadow:
         # create shadow fp32 weights for fp16 variable
         param_fp32 = tf.compat.v1.get_variable(
-            name=param_name + "/shadow",
+            name=f"{param_name}/shadow",
             dtype=tf.float32,
             trainable=False,
-            initializer=tf.cast(param.initialized_value(), tf.float32))
+            initializer=tf.cast(param.initialized_value(), tf.float32),
+        )
       else:
         param_fp32 = param
 
       m = tf.compat.v1.get_variable(
-          name=param_name + "/adam_m",
+          name=f"{param_name}/adam_m",
           shape=param.shape.as_list(),
           dtype=tf.float32,
           trainable=False,
-          initializer=tf.zeros_initializer())
+          initializer=tf.zeros_initializer(),
+      )
       v = tf.compat.v1.get_variable(
-          name=param_name + "/adam_v",
+          name=f"{param_name}/adam_v",
           shape=param.shape.as_list(),
           dtype=tf.float32,
           trainable=False,
-          initializer=tf.zeros_initializer())
+          initializer=tf.zeros_initializer(),
+      )
 
       # LAMB update
       next_m = (
@@ -688,5 +693,5 @@ class LAMBOptimizer(tf.compat.v1.train.Optimizer):
     """Get the variable name from the tensor name."""
     m = re.match("^(.*):\\d+$", param_name)
     if m is not None:
-      param_name = m.group(1)
+      param_name = m[1]
     return param_name

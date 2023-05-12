@@ -116,7 +116,7 @@ class TFEmbeddings(tf.keras.layers.Layer):
         elif mode == "linear":
             return self._linear(inputs)
         else:
-            raise ValueError("mode {} is not valid.".format(mode))
+            raise ValueError(f"mode {mode} is not valid.")
 
     def _embedding(self, inputs, training=False):
         """
@@ -248,10 +248,7 @@ class TFMultiHeadSelfAttention(tf.keras.layers.Layer):
         context = unshape(context)             # (bs, q_length, dim)
         context = self.out_lin(context)        # (bs, q_length, dim)
 
-        if self.output_attentions:
-            return (context, weights)
-        else:
-            return (context,)
+        return (context, weights) if self.output_attentions else (context, )
 
 class TFFFN(tf.keras.layers.Layer):
     def __init__(self, config, **kwargs):
@@ -263,7 +260,10 @@ class TFFFN(tf.keras.layers.Layer):
         self.lin2 = tf.keras.layers.Dense(config.dim,
                                           kernel_initializer=get_initializer(config.initializer_range),
                                           name="lin2")
-        assert config.activation in ['relu', 'gelu'], "activation ({}) must be in ['relu', 'gelu']".format(config.activation)
+        assert config.activation in [
+            'relu',
+            'gelu',
+        ], f"activation ({config.activation}) must be in ['relu', 'gelu']"
         self.activation = tf.keras.layers.Activation(gelu) if config.activation=='gelu' else tf.keras.activations.relu
 
     def call(self, input, training=False):
@@ -335,8 +335,10 @@ class TFTransformer(tf.keras.layers.Layer):
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
 
-        self.layer = [TFTransformerBlock(config, name='layer_._{}'.format(i))
-                      for i in range(config.n_layers)]
+        self.layer = [
+            TFTransformerBlock(config, name=f'layer_._{i}')
+            for i in range(config.n_layers)
+        ]
 
     def call(self, inputs, training=False):
         """
@@ -433,9 +435,9 @@ class TFDistilBertMainLayer(tf.keras.layers.Layer):
             head_mask = [None] * self.num_hidden_layers
 
         embedding_output = self.embeddings(input_ids)   # (bs, seq_length, dim)
-        tfmr_output = self.transformer([embedding_output, attention_mask, head_mask], training=training)
-
-        return tfmr_output # last-layer hidden-state, (all hidden_states), (all attentions)
+        return self.transformer(
+            [embedding_output, attention_mask, head_mask], training=training
+        )
 
 
 ### INTERFACE FOR ENCODER AND TASK SPECIFIC MODEL ###
@@ -542,8 +544,7 @@ class TFDistilBertModel(TFDistilBertPreTrainedModel):
         self.distilbert = TFDistilBertMainLayer(config, name="distilbert")   # Embeddings
 
     def call(self, inputs, **kwargs):
-        outputs = self.distilbert(inputs, **kwargs)
-        return outputs
+        return self.distilbert(inputs, **kwargs)
 
 
 class TFDistilBertLMHead(tf.keras.layers.Layer):
@@ -618,8 +619,7 @@ class TFDistilBertForMaskedLM(TFDistilBertPreTrainedModel):
         prediction_logits = self.vocab_layer_norm(prediction_logits)  # (bs, seq_length, dim)
         prediction_logits = self.vocab_projector(prediction_logits)
 
-        outputs = (prediction_logits,) + distilbert_output[1:]
-        return outputs  # logits, (hidden_states), (attentions)
+        return (prediction_logits,) + distilbert_output[1:]
 
 
 @add_start_docstrings("""DistilBert Model transformer with a sequence classification/regression head on top (a linear layer on top of
@@ -673,8 +673,7 @@ class TFDistilBertForSequenceClassification(TFDistilBertPreTrainedModel):
         pooled_output = self.dropout(pooled_output, training=kwargs.get('training', False))         # (bs, dim)
         logits = self.classifier(pooled_output)              # (bs, dim)
 
-        outputs = (logits,) + distilbert_output[1:]
-        return outputs  # logits, (hidden_states), (attentions)
+        return (logits,) + distilbert_output[1:]
 
 
 @add_start_docstrings("""DistilBert Model with a span classification head on top for extractive question-answering tasks like SQuAD (a linear layers on top of
@@ -727,5 +726,4 @@ class TFDistilBertForQuestionAnswering(TFDistilBertPreTrainedModel):
         start_logits = tf.squeeze(start_logits, axis=-1)
         end_logits = tf.squeeze(end_logits, axis=-1)
 
-        outputs = (start_logits, end_logits,) + distilbert_output[1:]
-        return outputs  # start_logits, end_logits, (hidden_states), (attentions)
+        return (start_logits, end_logits,) + distilbert_output[1:]

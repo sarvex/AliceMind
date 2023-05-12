@@ -75,11 +75,8 @@ class PreTrainedModel(nn.Module):
         super(PreTrainedModel, self).__init__()
         if not isinstance(config, PretrainedConfig):
             raise ValueError(
-                "Parameter config in `{}(config)` should be an instance of class `PretrainedConfig`. "
-                "To create a model from a pretrained model use "
-                "`model = {}.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
-                    self.__class__.__name__, self.__class__.__name__
-                ))
+                f"Parameter config in `{self.__class__.__name__}(config)` should be an instance of class `PretrainedConfig`. To create a model from a pretrained model use `model = {self.__class__.__name__}.from_pretrained(PRETRAINED_MODEL_NAME)`"
+            )
         # Save config in model
         self.config = config
 
@@ -202,7 +199,7 @@ class PreTrainedModel(nn.Module):
         # If we save using the predefined names, we can load using `from_pretrained`
         output_model_file = os.path.join(save_directory, WEIGHTS_NAME)
         torch.save(model_to_save.state_dict(), output_model_file)
-        logger.info("Model weights saved in {}".format(output_model_file))
+        logger.info(f"Model weights saved in {output_model_file}")
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
@@ -294,9 +291,15 @@ class PreTrainedModel(nn.Module):
             if pretrained_model_name_or_path in cls.pretrained_model_archive_map:
                 archive_file = cls.pretrained_model_archive_map[pretrained_model_name_or_path]
             elif os.path.isdir(pretrained_model_name_or_path):
-                if from_tf and os.path.isfile(os.path.join(pretrained_model_name_or_path, TF_WEIGHTS_NAME + ".index")):
+                if from_tf and os.path.isfile(
+                    os.path.join(
+                        pretrained_model_name_or_path, f"{TF_WEIGHTS_NAME}.index"
+                    )
+                ):
                     # Load from a TF 1.0 checkpoint
-                    archive_file = os.path.join(pretrained_model_name_or_path, TF_WEIGHTS_NAME + ".index")
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path, f"{TF_WEIGHTS_NAME}.index"
+                    )
                 elif from_tf and os.path.isfile(os.path.join(pretrained_model_name_or_path, TF2_WEIGHTS_NAME)):
                     # Load from a TF 2.0 checkpoint
                     archive_file = os.path.join(pretrained_model_name_or_path, TF2_WEIGHTS_NAME)
@@ -304,14 +307,21 @@ class PreTrainedModel(nn.Module):
                     # Load from a PyTorch checkpoint
                     archive_file = os.path.join(pretrained_model_name_or_path, WEIGHTS_NAME)
                 else:
-                    raise EnvironmentError("Error no file named {} found in directory {} or `from_tf` set to False".format(
-                        [WEIGHTS_NAME, TF2_WEIGHTS_NAME, TF_WEIGHTS_NAME + ".index"],
-                        pretrained_model_name_or_path))
+                    raise EnvironmentError(
+                        "Error no file named {} found in directory {} or `from_tf` set to False".format(
+                            [
+                                WEIGHTS_NAME,
+                                TF2_WEIGHTS_NAME,
+                                f"{TF_WEIGHTS_NAME}.index",
+                            ],
+                            pretrained_model_name_or_path,
+                        )
+                    )
             elif os.path.isfile(pretrained_model_name_or_path):
                 archive_file = pretrained_model_name_or_path
             else:
                 assert from_tf, "Error finding file {}, no file or TF 1.X checkpoint found".format(pretrained_model_name_or_path)
-                archive_file = pretrained_model_name_or_path + ".index"
+                archive_file = f"{pretrained_model_name_or_path}.index"
 
             # redirect to the cache, if necessary
             try:
@@ -322,8 +332,8 @@ class PreTrainedModel(nn.Module):
                             archive_file)
                 else:
                     msg = "Model name '{}' was not found in model name list ({}). " \
-                        "We assumed '{}' was a path or url to model weight files named one of {} but " \
-                        "couldn't find any such file at this path or url.".format(
+                            "We assumed '{}' was a path or url to model weight files named one of {} but " \
+                            "couldn't find any such file at this path or url.".format(
                             pretrained_model_name_or_path,
                             ', '.join(cls.pretrained_model_archive_map.keys()),
                             archive_file,
@@ -395,18 +405,18 @@ class PreTrainedModel(nn.Module):
             start_prefix = ''
             model_to_load = model
             if not hasattr(model, cls.base_model_prefix) and any(s.startswith(cls.base_model_prefix) for s in state_dict.keys()):
-                start_prefix = cls.base_model_prefix + '.'
+                start_prefix = f'{cls.base_model_prefix}.'
             if hasattr(model, cls.base_model_prefix) and not any(s.startswith(cls.base_model_prefix) for s in state_dict.keys()):
                 model_to_load = getattr(model, cls.base_model_prefix)
 
             load(model_to_load, prefix=start_prefix)
-            if len(missing_keys) > 0:
+            if missing_keys:
                 logger.info("Weights of {} not initialized from pretrained model: {}".format(
                     model.__class__.__name__, missing_keys))
-            if len(unexpected_keys) > 0:
+            if unexpected_keys:
                 logger.info("Weights from pretrained model not used in {}: {}".format(
                     model.__class__.__name__, unexpected_keys))
-            if len(error_msgs) > 0:
+            if error_msgs:
                 raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
                                 model.__class__.__name__, "\n\t".join(error_msgs)))
 
@@ -631,7 +641,7 @@ class SQuADHead(nn.Module):
                 # note(zhiliny): by default multiply the loss by 0.5 so that the scale is comparable to start_loss and end_loss
                 total_loss += cls_loss * 0.5
 
-            outputs = (total_loss,) + outputs
+            return (total_loss,) + outputs
 
         else:
             # during inference, compute the end logits based on beam search
@@ -655,11 +665,13 @@ class SQuADHead(nn.Module):
             start_states = torch.einsum("blh,bl->bh", hidden_states, start_log_probs)
             cls_logits = self.answer_class(hidden_states, start_states=start_states, cls_index=cls_index)
 
-            outputs = (start_top_log_probs, start_top_index, end_top_log_probs, end_top_index, cls_logits) + outputs
-
-        # return start_top_log_probs, start_top_index, end_top_log_probs, end_top_index, cls_logits
-        # or (if labels are provided) (total_loss,)
-        return outputs
+            return (
+                start_top_log_probs,
+                start_top_index,
+                end_top_log_probs,
+                end_top_index,
+                cls_logits,
+            ) + outputs
 
 
 class SequenceSummary(nn.Module):
@@ -798,4 +810,4 @@ def prune_layer(layer, index, dim=None):
     elif isinstance(layer, Conv1D):
         return prune_conv1d_layer(layer, index, dim=1 if dim is None else dim)
     else:
-        raise ValueError("Can't prune layer of class {}".format(layer.__class__))
+        raise ValueError(f"Can't prune layer of class {layer.__class__}")

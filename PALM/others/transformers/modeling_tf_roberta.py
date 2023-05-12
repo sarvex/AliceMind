@@ -213,8 +213,7 @@ class TFRobertaModel(TFRobertaPreTrainedModel):
         self.roberta = TFRobertaMainLayer(config, name='roberta')
 
     def call(self, inputs, **kwargs):
-        outputs = self.roberta(inputs, **kwargs)
-        return outputs
+        return self.roberta(inputs, **kwargs)
 
 
 class TFRobertaLMHead(tf.keras.layers.Layer):

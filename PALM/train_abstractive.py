@@ -121,14 +121,14 @@ class ErrorHandler(object):
 
 def validate_abs(args, device_id):
     timestep = 0
-    if (args.test_all):
+    if args.test_all:
         cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
         cp_files.sort(key = lambda x: int(x.split("_")[-1][:-3]))
         print (cp_files)
         #cp_files.sort(key=os.path.getmtime)
         xent_lst = []
         #for i, cp in enumerate(cp_files):
-        for i, cp in enumerate(cp_files[::-1]):
+        for cp in cp_files[::-1]:
             step = int(cp.split('.')[-2].split('_')[-1])
             test_abs(args, device_id, cp, step)
             '''
@@ -150,13 +150,13 @@ def validate_abs(args, device_id):
             test_abs(args, device_id, cp, step)
         #'''
     else:
-        while (True):
+        while True:
             cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
             cp_files.sort(key=os.path.getmtime)
-            if (cp_files):
+            if cp_files:
                 cp = cp_files[-1]
                 time_of_cp = os.path.getmtime(cp)
-                if (not os.path.getsize(cp) > 0):
+                if os.path.getsize(cp) <= 0:
                     time.sleep(60)
                     continue
                 if (time_of_cp > timestep):
@@ -178,14 +178,11 @@ def validate_abs(args, device_id):
 
 def validate(args, device_id, pt, step):
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    if (pt != ''):
-        test_from = pt
-    else:
-        test_from = args.test_from
-    logger.info('Loading checkpoint from %s' % test_from)
+    test_from = pt if (pt != '') else args.test_from
+    logger.info(f'Loading checkpoint from {test_from}')
     checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
     opt = vars(checkpoint['opt'])
-    for k in opt.keys():
+    for k in opt:
         if (k in model_flags):
             setattr(args, k, opt[k])
     print(args)
@@ -219,20 +216,17 @@ def validate(args, device_id, pt, step):
 
 def test_abs(args, device_id, pt, step):
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    if (pt != ''):
-        test_from = pt
-    else:
-        test_from = args.test_from
-    logger.info('Loading checkpoint from %s' % test_from)
+    test_from = pt if (pt != '') else args.test_from
+    logger.info(f'Loading checkpoint from {test_from}')
 
     checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
     opt = vars(checkpoint['opt'])
     encoder = args.encoder
-    for k in opt.keys():
+    for k in opt:
         if (k in model_flags):
             setattr(args, k, opt[k])
     #print(args)
-    args.encoder = encoder 
+    args.encoder = encoder
     if args.encoder == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained(args.model_pth, do_lower_case=False)
         symbols = {'BOS': tokenizer.cls_token_id, 'EOS': tokenizer.sep_token_id,
@@ -258,15 +252,12 @@ def test_abs(args, device_id, pt, step):
 
 def test_text_abs(args, device_id, pt, step):
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
-    if (pt != ''):
-        test_from = pt
-    else:
-        test_from = args.test_from
-    logger.info('Loading checkpoint from %s' % test_from)
+    test_from = pt if (pt != '') else args.test_from
+    logger.info(f'Loading checkpoint from {test_from}')
 
     checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
     opt = vars(checkpoint['opt'])
-    for k in opt.keys():
+    for k in opt:
         if (k in model_flags):
             setattr(args, k, opt[k])
     print(args)
@@ -318,7 +309,7 @@ def train_abs_single(args, device_id):
     logger.info(str(args))
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     logger.info('Device ID %d' % device_id)
-    logger.info('Device %s' % device)
+    logger.info(f'Device {device}')
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     torch.backends.cudnn.deterministic = True
@@ -328,12 +319,12 @@ def train_abs_single(args, device_id):
         torch.cuda.manual_seed(args.seed)
 
     if args.train_from != '':
-        logger.info('Loading checkpoint from %s' % args.train_from)
+        logger.info(f'Loading checkpoint from {args.train_from}')
         checkpoint = torch.load(args.train_from,
                                 map_location=lambda storage, loc: storage)
         opt = vars(checkpoint['opt'])
         encoder = args.encoder
-        for k in opt.keys():
+        for k in opt:
             if (k in model_flags):
                 setattr(args, k, opt[k])
         args.encoder = encoder
@@ -341,9 +332,9 @@ def train_abs_single(args, device_id):
         checkpoint = None
 
     if (args.load_from_extractive != ''):
-        logger.info('Loading bert from extractive model %s' % args.load_from_extractive)
+        logger.info(f'Loading bert from extractive model {args.load_from_extractive}')
         bert_from_extractive = torch.load(args.load_from_extractive, map_location=lambda storage, loc: storage)
-        #bert_from_extractive = bert_from_extractive['model']
+            #bert_from_extractive = bert_from_extractive['model']
     else:
         bert_from_extractive = None
     torch.manual_seed(args.seed)
@@ -367,7 +358,7 @@ def train_abs_single(args, device_id):
         symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'],
                    'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
 
-         
+
     model = AbsSummarizer(args, device, checkpoint, bert_from_extractive, None)
     if (args.sep_optim):
         optim_bert = model_builder.build_optim_bert(args, model, checkpoint)

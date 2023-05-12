@@ -65,8 +65,7 @@ class LatticeEncoding(object):
     if self.cand_indices is not None:
       new_cand_indices = []
       for cand_index in self.cand_indices:
-        new_cand_index = [index - 1 for index in cand_index if index > 0]
-        if len(new_cand_index) > 0:
+        if new_cand_index := [index - 1 for index in cand_index if index > 0]:
           new_cand_indices.append(new_cand_index)
       self.cand_indices = new_cand_indices
 
@@ -79,8 +78,7 @@ class LatticeEncoding(object):
     if self.cand_indices is not None:
       new_cand_indices = []
       for cand_index in self.cand_indices:
-        new_cand_index = [index for index in cand_index if index != last]
-        if len(new_cand_index) > 0:
+        if new_cand_index := [index for index in cand_index if index != last]:
           new_cand_indices.append(new_cand_index)
       self.cand_indices = new_cand_indices
 
@@ -116,8 +114,10 @@ class LatticeEncoding(object):
     if self.cand_indices is not None:
       new_cand_indices = []
       for cand_index in self.cand_indices:
-        new_cand_index = [index - self._to_pop_front for index in cand_index if index >= self._to_pop_front]
-        if len(new_cand_index) > 0:
+        if new_cand_index := [
+            index - self._to_pop_front for index in cand_index
+            if index >= self._to_pop_front
+        ]:
           new_cand_indices.append(new_cand_index)
       self.cand_indices = new_cand_indices
     self._to_pop_front = None
@@ -133,8 +133,7 @@ class LatticeEncoding(object):
       new_cand_indices = []
       boundary = len(self.tokens) - self._to_pop_back
       for cand_index in self.cand_indices:
-        new_cand_index = [index for index in cand_index if index < boundary]
-        if len(new_cand_index) > 0:
+        if new_cand_index := [index for index in cand_index if index < boundary]:
           new_cand_indices.append(new_cand_index)
       self.cand_indices = new_cand_indices
     self._to_pop_back = None
@@ -146,14 +145,14 @@ class LatticeEncoding(object):
     raise NotImplementedError()
 
   def position_embedding(self, modes):
-    assert all([mode in ('start', 'middle', 'end', 'length') for mode in modes])
+    assert all(mode in ('start', 'middle', 'end', 'length') for mode in modes)
 
     retval = []
     for mode in modes:
       if mode == 'start':
-        retval.append([t for t in self.positions])
+        retval.append(list(self.positions))
       elif mode == 'length':
-        retval.append([t for t in self.lengths])
+        retval.append(list(self.lengths))
       elif mode == 'end':
         retval.append([s + l - 1 for s, l in zip(self.positions, self.lengths)])
       elif mode == 'middle':
@@ -181,7 +180,7 @@ class LatticeTokenizer(object):
     # lexicon = {zzz}
     # vocab = {z, #z}
     with open(lexicon_file, 'r') as reader:
-      for lid, line in enumerate(reader):
+      for line in reader:
         output = self.bert_tokenizer.encode(line, add_special_tokens=False)
         key = self.kDelimiter.join(output.tokens)
         name = line.strip()
@@ -247,7 +246,7 @@ class LatticeTokenizer(object):
         graph.add_edges(edges)
 
       boundaries.sort()
-      boundaries = boundaries + [len(tokens)]
+      boundaries += [len(tokens)]
       cand_indices = [[] for _ in boundaries]
       for index, (position, length) in enumerate(zip(positions, lengths)):
         right_index = bisect.bisect_left(boundaries, position + length)
@@ -367,7 +366,7 @@ class LatticeTokenizerWithMapping(object):
         graph.add_edges(edges)
 
       boundaries.sort()
-      boundaries = boundaries + [len(tokens)]
+      boundaries += [len(tokens)]
       cand_indices = [[] for _ in boundaries]
       for index, (position, length) in enumerate(zip(positions, lengths)):
         right_index = bisect.bisect_left(boundaries, position + length)

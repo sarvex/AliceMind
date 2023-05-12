@@ -229,10 +229,7 @@ def _read_tsv(input_file, quotechar=None):
   """Reads a tab separated value file."""
   with tf.io.gfile.GFile(input_file, "r") as f:
     reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
-    lines = []
-    for line in reader:
-      lines.append(line)
-    return lines
+    return list(reader)
 
 
 class SentenceClassificationProcessor(DataProcessor):
@@ -260,11 +257,11 @@ class SentenceClassificationProcessor(DataProcessor):
     labels = set()
     for index, line in enumerate(lines):
       if len(line) <= self.label_id:
-        tf.compat.v1.logging.warn('Line {}: in illegal format, skipped'.format(index))
+        tf.compat.v1.logging.warn(f'Line {index}: in illegal format, skipped')
         continue
       label = tokenization.convert_to_unicode(line[self.label_id])
       labels.add(label)
-    self._labels = [label for label in sorted(labels)]
+    self._labels = list(sorted(labels))
     return self._labels
 
   def _create_examples(self, lines, set_type):
@@ -272,10 +269,10 @@ class SentenceClassificationProcessor(DataProcessor):
     for (index, line) in enumerate(lines):
       # skip header
       if len(line) <= self.label_id:
-        tf.compat.v1.logging.warn('Line {}: in illegal format, skipped'.format(index))
+        tf.compat.v1.logging.warn(f'Line {index}: in illegal format, skipped')
         continue
-      guid = "%s-%s" % (set_type, index)
-      if set_type == "test" or set_type == "unlabeled":
+      guid = f"{set_type}-{index}"
+      if set_type in ["test", "unlabeled"]:
         text_a = tokenization.convert_to_unicode(line[self.text_a_id])
         label = None
       else:
@@ -303,15 +300,14 @@ class SentenceClassificationProcessor(DataProcessor):
 
     numbers = np.array(numbers)
     numbers.sort()
-    token_stats = {
-      "ave": np.mean(numbers),
-      "median": np.median(numbers),
-      "top80": np.percentile(numbers, 80),
-      "top90": np.percentile(numbers, 90),
-      "top95": np.percentile(numbers, 95),
-      "top99": np.percentile(numbers, 99)
+    return {
+        "ave": np.mean(numbers),
+        "median": np.median(numbers),
+        "top80": np.percentile(numbers, 80),
+        "top90": np.percentile(numbers, 90),
+        "top95": np.percentile(numbers, 95),
+        "top99": np.percentile(numbers, 99),
     }
-    return token_stats
 
 
 class SentencePairClassificationProcessor(DataProcessor):
@@ -340,22 +336,22 @@ class SentencePairClassificationProcessor(DataProcessor):
     labels = set()
     for index, line in enumerate(lines):
       if len(line) <= self.label_id:
-        tf.compat.v1.logging.warn('Line {}: in illegal format, skipped'.format(index))
+        tf.compat.v1.logging.warn(f'Line {index}: in illegal format, skipped')
         continue
       label = tokenization.convert_to_unicode(line[self.label_id])
       labels.add(label)
-    self._labels = [label for label in sorted(labels)]
+    self._labels = list(sorted(labels))
     return self._labels
 
   def _create_examples(self, lines, set_type):
     examples = []
     for index, line in enumerate(lines):
       # skip header
-      guid = "%s-%s" % (set_type, index)
+      guid = f"{set_type}-{index}"
       if len(line) <= self.label_id:
-        tf.compat.v1.logging.warn('Line {}: in illegal format, skipped'.format(index))
+        tf.compat.v1.logging.warn(f'Line {index}: in illegal format, skipped')
         continue
-      if set_type == "test" or set_type == "unlabeled":
+      if set_type in ["test", "unlabeled"]:
         text_a = tokenization.convert_to_unicode(line[self.text_a_id])
         text_b = tokenization.convert_to_unicode(line[self.text_b_id])
         label = None
@@ -379,23 +375,22 @@ class SentencePairClassificationProcessor(DataProcessor):
     for example in examples:
       if self.tokenizer:
         num_tokens = len(self.tokenizer.tokenize(example.text_a)) + \
-                     len(self.tokenizer.tokenize(example.text_b)) + 3
+                       len(self.tokenizer.tokenize(example.text_b)) + 3
       else:
         num_tokens = len(tokenization.convert_to_unicode(example.text_a)) + \
-                     len(tokenization.convert_to_unicode(example.text_b)) + 3
+                       len(tokenization.convert_to_unicode(example.text_b)) + 3
       numbers.append(num_tokens)
 
     numbers = np.array(numbers)
     numbers.sort()
-    token_stats = {
-      "ave": np.mean(numbers),
-      "median": np.median(numbers),
-      "top80": np.percentile(numbers, 80),
-      "top90": np.percentile(numbers, 90),
-      "top95": np.percentile(numbers, 95),
-      "top99": np.percentile(numbers, 99)
+    return {
+        "ave": np.mean(numbers),
+        "median": np.median(numbers),
+        "top80": np.percentile(numbers, 80),
+        "top90": np.percentile(numbers, 90),
+        "top95": np.percentile(numbers, 95),
+        "top99": np.percentile(numbers, 99),
     }
-    return token_stats
 
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
@@ -412,10 +407,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
       label_id=0,
       is_real_example=False,)
 
-  label_map = {}
-  for (i, label) in enumerate(label_list):
-    label_map[label] = i
-
+  label_map = {label: i for i, label in enumerate(label_list)}
   encoding_a = tokenizer.tokenize(example.text_a, add_candidate_indices=False)
   encoding_b = None
   if example.text_b:
@@ -487,33 +479,36 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   assert len(positional_embeddings_start) == max_seq_length
   assert len(positional_embeddings_end) == max_seq_length
 
-  if example.label:
-    label_id = label_map[example.label]
-  else:
-    label_id = 0
+  label_id = label_map[example.label] if example.label else 0
   if ex_index < 5:
     tf.compat.v1.logging.info("*** Example ***")
-    tf.compat.v1.logging.info("guid: %s" % (example.guid))
-    tf.compat.v1.logging.info("tokens: %s" % " ".join(
-      [tokenization.printable_text(x) for x in encoding.tokens]))
-    tf.compat.v1.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-    tf.compat.v1.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-    tf.compat.v1.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+    tf.compat.v1.logging.info(f"guid: {example.guid}")
     tf.compat.v1.logging.info(
-      "positional_embeddings_start: %s" % " ".join([str(x) for x in positional_embeddings_start]))
+        f'tokens: {" ".join([tokenization.printable_text(x) for x in encoding.tokens])}'
+    )
     tf.compat.v1.logging.info(
-      "positional_embeddings_end: %s" % " ".join([str(x) for x in positional_embeddings_end]))
+        f'input_ids: {" ".join([str(x) for x in input_ids])}')
+    tf.compat.v1.logging.info(
+        f'input_mask: {" ".join([str(x) for x in input_mask])}')
+    tf.compat.v1.logging.info(
+        f'segment_ids: {" ".join([str(x) for x in segment_ids])}')
+    tf.compat.v1.logging.info(
+        f'positional_embeddings_start: {" ".join([str(x) for x in positional_embeddings_start])}'
+    )
+    tf.compat.v1.logging.info(
+        f'positional_embeddings_end: {" ".join([str(x) for x in positional_embeddings_end])}'
+    )
     tf.compat.v1.logging.info("label: %s (id = %d)" % (example.label, label_id))
 
-  feature = InputFeatures(
-    input_ids=input_ids,
-    input_mask=input_mask,
-    segment_ids=segment_ids,
-    label_id=label_id,
-    positional_embeddings_start=positional_embeddings_start,
-    positional_embeddings_end=positional_embeddings_end,
-    is_real_example=True,)
-  return feature
+  return InputFeatures(
+      input_ids=input_ids,
+      input_mask=input_mask,
+      segment_ids=segment_ids,
+      label_id=label_id,
+      positional_embeddings_start=positional_embeddings_start,
+      positional_embeddings_end=positional_embeddings_end,
+      is_real_example=True,
+  )
 
 
 def file_based_convert_examples_to_features(
@@ -703,7 +698,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate, be
     if do_log_information:
       tf.compat.v1.logging.info("*** Features ***")
       for name in sorted(features.keys()):
-        tf.compat.v1.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
+        tf.compat.v1.logging.info(f"  name = {name}, shape = {features[name].shape}")
 
     input_ids = features["input_ids"]
     input_mask = features["input_mask"]
@@ -818,7 +813,7 @@ def main(_):
   task_name = FLAGS.task_name.lower()
 
   if task_name not in ("single", "pair"):
-    raise ValueError("Task not found: %s" % (task_name))
+    raise ValueError(f"Task not found: {task_name}")
 
   if task_name == "single":
     processor = SentenceClassificationProcessor()

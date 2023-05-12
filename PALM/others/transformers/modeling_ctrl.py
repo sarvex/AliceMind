@@ -52,8 +52,7 @@ def positional_encoding(position, d_model_size, dtype):
     sines = torch.sin(angle_rads[:, 0::2])
     cosines = torch.cos(angle_rads[:, 1::2])
 
-    pos_encoding = torch.cat([sines, cosines], dim=-1)
-    return pos_encoding
+    return torch.cat([sines, cosines], dim=-1)
 
 def scaled_dot_product_attention(q, k, v, mask, attention_mask=None, head_mask=None):
     # calculate attention
@@ -162,8 +161,7 @@ class EncoderLayer(torch.nn.Module):
         ffn_output = self.dropout2(ffn_output)
         out2 = out1 + ffn_output
 
-        outputs = (out2,) + attn_outputs[1:]
-        return outputs
+        return (out2,) + attn_outputs[1:]
 
 
 class CTRLPreTrainedModel(PreTrainedModel):

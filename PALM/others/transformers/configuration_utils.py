@@ -68,7 +68,7 @@ class PretrainedConfig(object):
         output_config_file = os.path.join(save_directory, CONFIG_NAME)
 
         self.to_json_file(output_config_file)
-        logger.info("Configuration saved in {}".format(output_config_file))
+        logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
@@ -133,28 +133,25 @@ class PretrainedConfig(object):
             resolved_config_file = cached_path(config_file, cache_dir=cache_dir, force_download=force_download, proxies=proxies)
         except EnvironmentError:
             if pretrained_model_name_or_path in cls.pretrained_config_archive_map:
-                msg = "Couldn't reach server at '{}' to download pretrained model configuration file.".format(
-                        config_file)
+                msg = f"Couldn't reach server at '{config_file}' to download pretrained model configuration file."
             else:
-                msg = "Model name '{}' was not found in model name list ({}). " \
-                      "We assumed '{}' was a path or url to a configuration file named {} or " \
-                      "a directory containing such a file but couldn't find any such file at this path or url.".format(
-                        pretrained_model_name_or_path,
-                        ', '.join(cls.pretrained_config_archive_map.keys()),
-                        config_file, CONFIG_NAME)
+                msg = f"Model name '{pretrained_model_name_or_path}' was not found in model name list ({', '.join(cls.pretrained_config_archive_map.keys())}). We assumed '{config_file}' was a path or url to a configuration file named {CONFIG_NAME} or a directory containing such a file but couldn't find any such file at this path or url."
             raise EnvironmentError(msg)
 
         if resolved_config_file == config_file:
-            logger.info("loading configuration file {}".format(config_file))
+            logger.info(f"loading configuration file {config_file}")
         else:
-            logger.info("loading configuration file {} from cache at {}".format(
-                config_file, resolved_config_file))
+            logger.info(
+                f"loading configuration file {config_file} from cache at {resolved_config_file}"
+            )
 
         # Load config
         config = cls.from_json_file(resolved_config_file)
 
         if hasattr(config, 'pruned_heads'):
-            config.pruned_heads = dict((int(key), value) for key, value in config.pruned_heads.items())
+            config.pruned_heads = {
+                int(key): value for key, value in config.pruned_heads.items()
+            }
 
         # Update config with kwargs if needed
         to_remove = []
@@ -166,10 +163,7 @@ class PretrainedConfig(object):
             kwargs.pop(key, None)
 
         logger.info("Model config %s", str(config))
-        if return_unused_kwargs:
-            return config, kwargs
-        else:
-            return config
+        return (config, kwargs) if return_unused_kwargs else config
 
     @classmethod
     def from_dict(cls, json_object):
@@ -194,8 +188,7 @@ class PretrainedConfig(object):
 
     def to_dict(self):
         """Serializes this instance to a Python dictionary."""
-        output = copy.deepcopy(self.__dict__)
-        return output
+        return copy.deepcopy(self.__dict__)
 
     def to_json_string(self):
         """Serializes this instance to a JSON string."""

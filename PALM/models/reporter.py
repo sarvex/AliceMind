@@ -19,9 +19,9 @@ def build_report_manager(opt):
     else:
         writer = None
 
-    report_mgr = ReportMgr(opt.report_every, start_time=-1,
-                           tensorboard_writer=writer)
-    return report_mgr
+    return ReportMgr(
+        opt.report_every, start_time=-1, tensorboard_writer=writer
+    )
 
 
 class ReportMgrBase(object):
@@ -275,8 +275,8 @@ class Statistics(object):
     def log_tensorboard(self, prefix, writer, learning_rate, step):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
-        writer.add_scalar(prefix + "/xent", self.xent(), step)
-        writer.add_scalar(prefix + "/ppl", self.ppl(), step)
-        writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
-        writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
-        writer.add_scalar(prefix + "/lr", learning_rate, step)
+        writer.add_scalar(f"{prefix}/xent", self.xent(), step)
+        writer.add_scalar(f"{prefix}/ppl", self.ppl(), step)
+        writer.add_scalar(f"{prefix}/accuracy", self.accuracy(), step)
+        writer.add_scalar(f"{prefix}/tgtper", self.n_words / t, step)
+        writer.add_scalar(f"{prefix}/lr", learning_rate, step)

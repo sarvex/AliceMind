@@ -189,10 +189,7 @@ class MultiHeadSelfAttention(nn.Module):
         context = unshape(context)             # (bs, q_length, dim)
         context = self.out_lin(context)        # (bs, q_length, dim)
 
-        if self.output_attentions:
-            return (context, weights)
-        else:
-            return (context,)
+        return (context, weights) if self.output_attentions else (context, )
 
 class FFN(nn.Module):
     def __init__(self, config):
@@ -200,7 +197,10 @@ class FFN(nn.Module):
         self.dropout = nn.Dropout(p=config.dropout)
         self.lin1 = nn.Linear(in_features=config.dim, out_features=config.hidden_dim)
         self.lin2 = nn.Linear(in_features=config.hidden_dim, out_features=config.dim)
-        assert config.activation in ['relu', 'gelu'], "activation ({}) must be in ['relu', 'gelu']".format(config.activation)
+        assert config.activation in [
+            'relu',
+            'gelu',
+        ], f"activation ({config.activation}) must be in ['relu', 'gelu']"
         self.activation = gelu if config.activation == 'gelu' else nn.ReLU()
 
     def forward(self, input):
@@ -340,9 +340,8 @@ class DistilBertPreTrainedModel(PreTrainedModel):
     def _init_weights(self, module):
         """ Initialize the weights.
         """
-        if isinstance(module, nn.Embedding):
-            if module.weight.requires_grad:
-                module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+        if isinstance(module, nn.Embedding) and module.weight.requires_grad:
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
         if isinstance(module, nn.Linear):
             module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
         elif isinstance(module, nn.LayerNorm):
@@ -463,9 +462,7 @@ class DistilBertModel(DistilBertPreTrainedModel):
                                        attn_mask=attention_mask,
                                        head_mask=head_mask)
         hidden_state = tfmr_output[0]
-        output = (hidden_state, ) + tfmr_output[1:]
-
-        return output # last-layer hidden-state, (all hidden_states), (all attentions)
+        return (hidden_state, ) + tfmr_output[1:]
 
 
 @add_start_docstrings("""DistilBert Model with a `masked language modeling` head on top. """,

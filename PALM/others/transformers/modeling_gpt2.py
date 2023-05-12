@@ -53,13 +53,13 @@ def load_tf_weights_in_gpt2(model, config, gpt2_checkpoint_path):
             "https://www.tensorflow.org/install/ for installation instructions.")
         raise
     tf_path = os.path.abspath(gpt2_checkpoint_path)
-    logger.info("Converting TensorFlow checkpoint from {}".format(tf_path))
+    logger.info(f"Converting TensorFlow checkpoint from {tf_path}")
     # Load weights from TF model
     init_vars = tf.train.list_variables(tf_path)
     names = []
     arrays = []
     for name, shape in init_vars:
-        logger.info("Loading TF weight {} with shape {}".format(name, shape))
+        logger.info(f"Loading TF weight {name} with shape {shape}")
         array = tf.train.load_variable(tf_path, name)
         names.append(name)
         arrays.append(array.squeeze())
@@ -73,11 +73,11 @@ def load_tf_weights_in_gpt2(model, config, gpt2_checkpoint_path):
                 l = re.split(r'(\d+)', m_name)
             else:
                 l = [m_name]
-            if l[0] == 'w' or l[0] == 'g':
+            if l[0] in ['w', 'g']:
                 pointer = getattr(pointer, 'weight')
             elif l[0] == 'b':
                 pointer = getattr(pointer, 'bias')
-            elif l[0] == 'wpe' or l[0] == 'wte':
+            elif l[0] in ['wpe', 'wte']:
                 pointer = getattr(pointer, l[0])
                 pointer = getattr(pointer, 'weight')
             else:
@@ -90,7 +90,7 @@ def load_tf_weights_in_gpt2(model, config, gpt2_checkpoint_path):
         except AssertionError as e:
             e.args += (pointer.shape, array.shape)
             raise
-        logger.info("Initialize PyTorch weight {}".format(name))
+        logger.info(f"Initialize PyTorch weight {name}")
         pointer.data = torch.from_numpy(array)
     return model
 
@@ -172,10 +172,7 @@ class Attention(nn.Module):
     def split_heads(self, x, k=False):
         new_x_shape = x.size()[:-1] + (self.n_head, x.size(-1) // self.n_head)
         x = x.view(*new_x_shape)  # in Tensorflow implem: fct split_states
-        if k:
-            return x.permute(0, 2, 3, 1)  # (batch, head, head_features, seq_length)
-        else:
-            return x.permute(0, 2, 1, 3)  # (batch, head, seq_length, head_features)
+        return x.permute(0, 2, 3, 1) if k else x.permute(0, 2, 1, 3)
 
     def forward(self, x, layer_past=None, attention_mask=None, head_mask=None):
         x = self.c_attn(x)
@@ -196,8 +193,7 @@ class Attention(nn.Module):
         a = self.c_proj(a)
         a = self.resid_dropout(a)
 
-        outputs = [a, present] + attn_outputs[1:]
-        return outputs  # a, present, (attentions)
+        return [a, present] + attn_outputs[1:]
 
 
 class MLP(nn.Module):
@@ -235,8 +231,7 @@ class Block(nn.Module):
         m = self.mlp(self.ln_2(x))
         x = x + m
 
-        outputs = [x] + output_attn[1:]
-        return outputs  # x, present, (attentions)
+        return [x] + output_attn[1:]
 
 
 class GPT2PreTrainedModel(PreTrainedModel):
@@ -419,10 +414,7 @@ class GPT2Model(GPT2PreTrainedModel):
 
         inputs_embeds = self.wte(input_ids)
         position_embeds = self.wpe(position_ids)
-        if token_type_ids is not None:
-            token_type_embeds = self.wte(token_type_ids)
-        else:
-            token_type_embeds = 0
+        token_type_embeds = 0 if token_type_ids is None else self.wte(token_type_ids)
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
         hidden_states = self.drop(hidden_states)
 

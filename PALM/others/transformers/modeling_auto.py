@@ -154,9 +154,9 @@ class AutoModel(object):
             return XLMModel.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         elif 'ctrl' in pretrained_model_name_or_path:
             return CTRLModel.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', "
-                         "'xlm', 'roberta, 'ctrl'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', 'xlm', 'roberta, 'ctrl'"
+        )
 
 
 class AutoModelWithLMHead(object):
@@ -280,9 +280,9 @@ class AutoModelWithLMHead(object):
             return XLMWithLMHeadModel.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         elif 'ctrl' in pretrained_model_name_or_path:
             return CTRLLMHeadModel.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', "
-                         "'xlm', 'roberta','ctrl'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', 'xlm', 'roberta','ctrl'"
+        )
 
 
 class AutoModelForSequenceClassification(object):
@@ -392,8 +392,9 @@ class AutoModelForSequenceClassification(object):
         elif 'xlm' in pretrained_model_name_or_path:
             return XLMForSequenceClassification.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'xlnet', 'xlm', 'roberta'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'xlnet', 'xlm', 'roberta'"
+        )
 
 
 class AutoModelForQuestionAnswering(object):
@@ -499,5 +500,6 @@ class AutoModelForQuestionAnswering(object):
         elif 'xlm' in pretrained_model_name_or_path:
             return XLMForQuestionAnswering.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'xlnet', 'xlm'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'xlnet', 'xlm'"
+        )

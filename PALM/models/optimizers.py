@@ -160,14 +160,14 @@ class Optimizer(object):
             for group in self.optimizer.param_groups:
                 for p in group['params']:
                     self.optimizer.state[p]['sum'] = self.optimizer\
-                        .state[p]['sum'].fill_(self.adagrad_accum)
+                            .state[p]['sum'].fill_(self.adagrad_accum)
         elif self.method == 'adadelta':
             self.optimizer = optim.Adadelta(self.params, lr=self.learning_rate)
         elif self.method == 'adam':
             self.optimizer = optim.Adam(self.params, lr=self.learning_rate,
                                         betas=self.betas, eps=1e-9)
         else:
-            raise RuntimeError("Invalid optim method: " + self.method)
+            raise RuntimeError(f"Invalid optim method: {self.method}")
 
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
@@ -196,10 +196,10 @@ class Optimizer(object):
             if ((self.start_decay_steps is not None) and (
                      self._step >= self.start_decay_steps)):
                 self.start_decay = True
-            if self.start_decay:
-                if ((self._step - self.start_decay_steps)
-                   % self.decay_steps == 0):
-                    self.learning_rate = self.learning_rate * self.lr_decay
+            if self.start_decay and (
+                (self._step - self.start_decay_steps) % self.decay_steps == 0
+            ):
+                self.learning_rate = self.learning_rate * self.lr_decay
 
         if self.method != 'sparseadam':
             self.optimizer.param_groups[0]['lr'] = self.learning_rate

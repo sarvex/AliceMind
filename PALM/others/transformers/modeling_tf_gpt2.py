@@ -150,8 +150,7 @@ class TFAttention(tf.keras.layers.Layer):
         a = self.c_proj(a)
         a = self.resid_dropout(a, training=training)
 
-        outputs = [a, present] + attn_outputs[1:]
-        return outputs  # a, present, (attentions)
+        return [a, present] + attn_outputs[1:]
 
 
 class TFMLP(tf.keras.layers.Layer):
@@ -191,8 +190,7 @@ class TFBlock(tf.keras.layers.Layer):
         m = self.mlp(m, training=training)
         x = x + m
 
-        outputs = [x] + output_attn[1:]
-        return outputs  # x, present, (attentions)
+        return [x] + output_attn[1:]
 
 
 class TFGPT2MainLayer(tf.keras.layers.Layer):
@@ -213,10 +211,10 @@ class TFGPT2MainLayer(tf.keras.layers.Layer):
                                              embeddings_initializer=get_initializer(config.initializer_range),
                                              name='wpe')
         self.drop = tf.keras.layers.Dropout(config.embd_pdrop)
-        self.h = [TFBlock(config.n_ctx,
-                          config,
-                          scale=True,
-                          name='h_._{}'.format(i)) for i in range(config.n_layer)]
+        self.h = [
+            TFBlock(config.n_ctx, config, scale=True, name=f'h_._{i}')
+            for i in range(config.n_layer)
+        ]
         self.ln_f = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_epsilon, name='ln_f')
 
     def _resize_token_embeddings(self, new_num_tokens):
@@ -280,7 +278,7 @@ class TFGPT2MainLayer(tf.keras.layers.Layer):
         # attention_probs has shape bsz x n_heads x N x N
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
-        if not head_mask is None:
+        if head_mask is not None:
             raise NotImplementedError
         else:
             head_mask = [None] * self.num_hidden_layers
@@ -446,8 +444,7 @@ class TFGPT2Model(TFGPT2PreTrainedModel):
         self.transformer = TFGPT2MainLayer(config, name='transformer')
 
     def call(self, inputs, **kwargs):
-        outputs = self.transformer(inputs, **kwargs)
-        return outputs
+        return self.transformer(inputs, **kwargs)
 
 
 @add_start_docstrings("""The GPT2 Model transformer with a language modeling head on top
@@ -492,9 +489,7 @@ class TFGPT2LMHeadModel(TFGPT2PreTrainedModel):
 
         lm_logits = self.transformer.wte(hidden_states, mode="linear")
 
-        outputs = (lm_logits,) + transformer_outputs[1:]
-
-        return outputs  # lm_logits, presents, (all hidden_states), (attentions)
+        return (lm_logits,) + transformer_outputs[1:]
 
 
 @add_start_docstrings("""The GPT2 Model transformer with a language modeling and a multiple-choice classification
@@ -599,6 +594,4 @@ class TFGPT2DoubleHeadsModel(TFGPT2PreTrainedModel):
 
         mc_logits = tf.squeeze(mc_logits, axis=-1)
 
-        outputs = (lm_logits, mc_logits) + transformer_outputs[1:]
-
-        return outputs  # lm logits, mc logits, presents, (all hidden_states), (attentions)
+        return (lm_logits, mc_logits) + transformer_outputs[1:]

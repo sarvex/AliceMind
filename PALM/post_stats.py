@@ -24,7 +24,7 @@ def has_repeat(elements):
 def cal_self_repeat(summary):
     ngram_repeats = {2: 0, 4: 0, 8: 0}
     sents = summary.split('<q>')
-    for n in ngram_repeats.keys():
+    for n in ngram_repeats:
         # Respect sentence boundary
         grams = reduce(lambda x, y: x + y, [n_grams(sent.split(), n) for sent in sents], [])
         ngram_repeats[n] += has_repeat(grams)
@@ -57,9 +57,11 @@ def cal_novel(summary, gold, source, summary_ngram_novel, gold_ngram_novel):
 
 
 def cal_repeat(args):
-    candidate_lines = open(args.result_path+'.candidate').read().strip().split('\n')
-    gold_lines = open(args.result_path+'.gold').read().strip().split('\n')
-    src_lines = open(args.result_path+'.raw_src').read().strip().split('\n')
+    candidate_lines = (
+        open(f'{args.result_path}.candidate').read().strip().split('\n')
+    )
+    gold_lines = open(f'{args.result_path}.gold').read().strip().split('\n')
+    src_lines = open(f'{args.result_path}.raw_src').read().strip().split('\n')
     lines = zip(candidate_lines,gold_lines,src_lines)
 
     summary_ngram_novel = {1: [0, 0, 0], 2: [0, 0, 0], 4: [0, 0, 0]}
@@ -70,7 +72,7 @@ def cal_repeat(args):
         cal_novel(c, g, s,summary_ngram_novel, gold_ngram_novel)
     print(summary_ngram_novel, gold_ngram_novel)
 
-    for n in summary_ngram_novel.keys():
+    for n in summary_ngram_novel:
         # summary_ngram_novel[n] = summary_ngram_novel[n][2]/len(src_lines)
         # gold_ngram_novel[n] = gold_ngram_novel[n][2]/len(src_lines)
         summary_ngram_novel[n] = summary_ngram_novel[n][0]/summary_ngram_novel[n][1]
@@ -85,4 +87,4 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
-    eval(args.mode + '(args)')
+    eval(f'{args.mode}(args)')

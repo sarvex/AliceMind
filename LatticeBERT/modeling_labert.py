@@ -276,9 +276,10 @@ def factorized_embedding_lookup(input_ids,
     initializer=create_initializer(initializer_range))
 
   projection = tf.compat.v1.get_variable(
-    name=word_embedding_name + "_projection",
-    shape=[embedding_size, hidden_size],
-    initializer=create_initializer(initializer_range))
+      name=f"{word_embedding_name}_projection",
+      shape=[embedding_size, hidden_size],
+      initializer=create_initializer(initializer_range),
+  )
 
   flat_input_ids = tf.reshape(input_ids, [-1])
   if use_one_hot_embeddings:
@@ -291,8 +292,7 @@ def factorized_embedding_lookup(input_ids,
 
   input_shape = get_shape_list(input_ids)
 
-  output = tf.reshape(output,
-                      input_shape[0:-1] + [input_shape[-1] * hidden_size])
+  output = tf.reshape(output, input_shape[:-1] + [input_shape[-1] * hidden_size])
   return (output, factorized_embedding_table)
 
 
@@ -393,10 +393,12 @@ def embedding_postprocessor(input_tensor,
 
         input_shape = get_shape_list(position_embeddings_id)
 
-        position_embeddings = tf.reshape(position_embeddings,
-                                         input_shape[0:-1] + [input_shape[-1] * widths[i]])
+        position_embeddings = tf.reshape(
+            position_embeddings,
+            input_shape[:-1] + [input_shape[-1] * widths[i]],
+        )
         all_positional_embeddings.append(position_embeddings)
-        # (8, 128, 384)
+              # (8, 128, 384)
       position_embeddings = tf.concat(all_positional_embeddings, -1)
       # print(position_embeddings.shape) # (8, 128, 768)
 
@@ -659,8 +661,10 @@ def compute_reset_attention_scores(position_embeddings_ids, max_position_embeddi
     input_shape = get_shape_list(position_embeddings_id)
 
     # position_embeddings: [B,L,E]
-    position_embeddings = tf.reshape(position_embeddings,
-                                     input_shape[0:-1] + [input_shape[-1] * embedding_size])
+    position_embeddings = tf.reshape(
+        position_embeddings,
+        input_shape[:-1] + [input_shape[-1] * embedding_size],
+    )
 
     position_embedding_outputs.append(position_embeddings)
 
@@ -936,7 +940,7 @@ def transformer_model(input_tensor,
       name_variable_scope = "layer_%d" % layer_idx
 
     with tf.compat.v1.variable_scope(name_variable_scope,
-                                     reuse=do_share_parameter_across_layers and layer_idx > 0):
+                                         reuse=do_share_parameter_across_layers and layer_idx > 0):
       layer_input = prev_output
 
       with tf.compat.v1.variable_scope("attention"):
@@ -960,12 +964,10 @@ def transformer_model(input_tensor,
 
           if do_return_attention_maps:
             attention_head, attention_prob = payload
-            attention_heads.append(attention_head)
             all_layer_attention_maps.append(attention_prob)
           else:
             attention_head = payload
-            attention_heads.append(attention_head)
-
+          attention_heads.append(attention_head)
         attention_output = None
         if len(attention_heads) == 1:
           attention_output = attention_heads[0]
@@ -1003,17 +1005,15 @@ def transformer_model(input_tensor,
         prev_output = layer_output
         all_layer_outputs.append(layer_output)
 
-  if do_return_all_layers:
-    final_outputs = []
-    for layer_output in all_layer_outputs:
-      final_output = reshape_from_matrix(layer_output, input_shape)
-      final_outputs.append(final_output)
-    if do_return_attention_maps:
-      return final_outputs, all_layer_attention_maps
-    return final_outputs
-  else:
-    final_output = reshape_from_matrix(prev_output, input_shape)
-    return final_output
+  if not do_return_all_layers:
+    return reshape_from_matrix(prev_output, input_shape)
+  final_outputs = []
+  for layer_output in all_layer_outputs:
+    final_output = reshape_from_matrix(layer_output, input_shape)
+    final_outputs.append(final_output)
+  if do_return_attention_maps:
+    return final_outputs, all_layer_attention_maps
+  return final_outputs
 
 
 def transformer_model_preln(input_tensor,
@@ -1105,7 +1105,7 @@ def transformer_model_preln(input_tensor,
       name_variable_scope = "layer_%d" % layer_idx
 
     with tf.compat.v1.variable_scope(name_variable_scope,
-                                     reuse=do_share_parameter_across_layers and layer_idx > 0):
+                                         reuse=do_share_parameter_across_layers and layer_idx > 0):
       layer_input = prev_output
 
       with tf.compat.v1.variable_scope("attention"):
@@ -1129,12 +1129,10 @@ def transformer_model_preln(input_tensor,
               do_return_attention_maps=do_return_attention_maps,)
           if do_return_attention_maps:
             attention_head, attention_prob = payload
-            attention_heads.append(attention_head)
             all_layer_attention_maps.append(attention_prob)
           else:
             attention_head = payload
-            attention_heads.append(attention_head)
-
+          attention_heads.append(attention_head)
         attention_output = None
         if len(attention_heads) == 1:
           attention_output = attention_heads[0]
@@ -1173,14 +1171,12 @@ def transformer_model_preln(input_tensor,
         prev_output = layer_output
         all_layer_outputs.append(layer_output)
 
-  if do_return_all_layers:
-    final_outputs = []
-    for layer_output in all_layer_outputs:
-      final_output = reshape_from_matrix(layer_output, input_shape)
-      final_outputs.append(final_output)
-    if do_return_attention_maps:
-      return final_outputs, all_layer_attention_maps
-    return final_outputs
-  else:
-    final_output = reshape_from_matrix(prev_output, input_shape)
-    return final_output
+  if not do_return_all_layers:
+    return reshape_from_matrix(prev_output, input_shape)
+  final_outputs = []
+  for layer_output in all_layer_outputs:
+    final_output = reshape_from_matrix(layer_output, input_shape)
+    final_outputs.append(final_output)
+  if do_return_attention_maps:
+    return final_outputs, all_layer_attention_maps
+  return final_outputs

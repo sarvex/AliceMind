@@ -19,13 +19,11 @@ import tokenization
 
 
 def create_int_feature(values):
-  feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
-  return feature
+  return tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
 
 
 def create_float_feature(values):
-  feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
-  return feature
+  return tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
 
 
 def write_lattice_instance_to_example_file(
@@ -39,8 +37,8 @@ def write_lattice_instance_to_example_file(
   for positional_embedding in positional_embeddings:
     for i in positional_embedding:
       assert i >= 0, f"{instance.encodings.tokens}"
-  input_mask = [1] * len(input_ids)
   segment_ids = list(instance.segment_ids)
+  input_mask = [1] * len(input_ids)
   assert len(input_ids) <= max_seq_length
 
   while len(input_ids) < max_seq_length:
@@ -78,7 +76,7 @@ def write_lattice_instance_to_example_file(
   features["masked_lm_weights"] = create_float_feature(masked_lm_weights)
   features["next_sentence_labels"] = create_int_feature([next_sentence_label])
 
-  assert all([len(t) == len(input_ids) for t in positional_embeddings])
+  assert all(len(t) == len(input_ids) for t in positional_embeddings)
 
   tf_example = tf.train.Example(features=tf.train.Features(feature=features))
 
@@ -86,8 +84,9 @@ def write_lattice_instance_to_example_file(
 
   if do_dump_example:
     tf.compat.v1.logging.info("*** Example ***")
-    tf.compat.v1.logging.info("tokens: %s" % " ".join(
-      [tokenization.printable_text(x) for x in instance.encodings.tokens]))
+    tf.compat.v1.logging.info(
+        f'tokens: {" ".join([tokenization.printable_text(x) for x in instance.encodings.tokens])}'
+    )
 
     for feature_name in features.keys():
       feature = features[feature_name]
@@ -97,7 +96,7 @@ def write_lattice_instance_to_example_file(
       elif feature.float_list.value:
         values = feature.float_list.value
       tf.compat.v1.logging.info(
-        "%s: %s" % (feature_name, " ".join([str(x) for x in values])))
+          f'{feature_name}: {" ".join([str(x) for x in values])}')
 
 
 def write_lattice_instances_to_example_files(
@@ -105,10 +104,7 @@ def write_lattice_instances_to_example_files(
     max_predictions_per_seq, output_files,
     position_embedding_names=('start', 'end')):
   """Create TF example files from `TrainingInstance`s."""
-  writers = []
-  for output_file in output_files:
-    writers.append(tf.io.TFRecordWriter(output_file))
-
+  writers = [tf.io.TFRecordWriter(output_file) for output_file in output_files]
   writer_index = 0
 
   total_written = 0
@@ -130,14 +126,11 @@ def write_lattice_instances_to_example_files(
 def write_instances_to_example_files(instances, tokenizer, max_seq_length,
                                      max_predictions_per_seq, output_files):
   """Create TF example files from `TrainingInstance`s."""
-  writers = []
-  for output_file in output_files:
-    writers.append(tf.io.TFRecordWriter(output_file))
-
+  writers = [tf.io.TFRecordWriter(output_file) for output_file in output_files]
   writer_index = 0
 
   total_written = 0
-  for (inst_index, instance) in enumerate(instances):
+  for inst_index, instance in enumerate(instances):
     input_ids = tokenizer.convert_tokens_to_ids(instance.encodings)
     input_mask = [1] * len(input_ids)
     segment_ids = list(instance.segment_ids)
@@ -181,8 +174,9 @@ def write_instances_to_example_files(instances, tokenizer, max_seq_length,
 
     if inst_index < 400:
       tf.compat.v1.logging.info("*** Example ***")
-      tf.compat.v1.logging.info("tokens: %s" % " ".join(
-          [tokenization.printable_text(x) for x in instance.encodings]))
+      tf.compat.v1.logging.info(
+          f'tokens: {" ".join([tokenization.printable_text(x) for x in instance.encodings])}'
+      )
 
       for feature_name in features.keys():
         feature = features[feature_name]
@@ -192,7 +186,7 @@ def write_instances_to_example_files(instances, tokenizer, max_seq_length,
         elif feature.float_list.value:
           values = feature.float_list.value
         tf.compat.v1.logging.info(
-            "%s: %s" % (feature_name, " ".join([str(x) for x in values])))
+            f'{feature_name}: {" ".join([str(x) for x in values])}')
 
   for writer in writers:
     writer.close()

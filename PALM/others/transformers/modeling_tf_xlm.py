@@ -260,13 +260,33 @@ class TFXLMMainLayer(tf.keras.layers.Layer):
         #     self.encoder_attn = []
 
         for i in range(self.n_layers):
-            self.attentions.append(TFMultiHeadAttention(self.n_heads, self.dim, config=config, name='attentions_._{}'.format(i)))
-            self.layer_norm1.append(tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name='layer_norm1_._{}'.format(i)))
+            self.attentions.append(
+                TFMultiHeadAttention(
+                    self.n_heads, self.dim, config=config, name=f'attentions_._{i}'
+                )
+            )
+            self.layer_norm1.append(
+                tf.keras.layers.LayerNormalization(
+                    epsilon=config.layer_norm_eps, name=f'layer_norm1_._{i}'
+                )
+            )
             # if self.is_decoder:
             #     self.layer_norm15.append(nn.LayerNorm(self.dim, eps=config.layer_norm_eps))
             #     self.encoder_attn.append(MultiHeadAttention(self.n_heads, self.dim, dropout=self.attention_dropout))
-            self.ffns.append(TFTransformerFFN(self.dim, self.hidden_dim, self.dim, config=config, name='ffns_._{}'.format(i)))
-            self.layer_norm2.append(tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name='layer_norm2_._{}'.format(i)))
+            self.ffns.append(
+                TFTransformerFFN(
+                    self.dim,
+                    self.hidden_dim,
+                    self.dim,
+                    config=config,
+                    name=f'ffns_._{i}',
+                )
+            )
+            self.layer_norm2.append(
+                tf.keras.layers.LayerNormalization(
+                    epsilon=config.layer_norm_eps, name=f'layer_norm2_._{i}'
+                )
+            )
 
         if hasattr(config, "pruned_heads"):
             pruned_heads = config.pruned_heads.copy().items()
@@ -560,8 +580,7 @@ class TFXLMModel(TFXLMPreTrainedModel):
         self.transformer = TFXLMMainLayer(config, name='transformer')
 
     def call(self, inputs, **kwargs):
-        outputs = self.transformer(inputs, **kwargs)
-        return outputs
+        return self.transformer(inputs, **kwargs)
 
 
 
@@ -686,8 +705,7 @@ class TFXLMForSequenceClassification(TFXLMPreTrainedModel):
 
         logits = self.sequence_summary(output)
 
-        outputs = (logits,) + transformer_outputs[1:]  # Keep new_mems and attention/hidden states if they are here
-        return outputs
+        return (logits,) + transformer_outputs[1:]
 
 
 @add_start_docstrings("""XLM Model with a span classification head on top for extractive question-answering tasks like SQuAD (a linear layers on top of
@@ -737,6 +755,4 @@ class TFXLMForQuestionAnsweringSimple(TFXLMPreTrainedModel):
         start_logits = tf.squeeze(start_logits, axis=-1)
         end_logits = tf.squeeze(end_logits, axis=-1)
 
-        outputs = (start_logits, end_logits,) + transformer_outputs[1:]  # Keep mems, hidden states, attentions if there are in it
-
-        return outputs  # start_logits, end_logits, (hidden_states), (attentions)
+        return (start_logits, end_logits,) + transformer_outputs[1:]

@@ -181,8 +181,7 @@ def gather_indexes(sequence_tensor, positions):
   flat_positions = tf.reshape(positions + flat_offsets, [-1])
   flat_sequence_tensor = tf.reshape(sequence_tensor,
                                     [batch_size * seq_length, width])
-  output_tensor = tf.gather(flat_sequence_tensor, flat_positions)
-  return output_tensor
+  return tf.gather(flat_sequence_tensor, flat_positions)
 
 
 def stable_ce_kl(logit, target, epsilon=1e-6):
@@ -203,19 +202,13 @@ def stable_ce_kl(logit, target, epsilon=1e-6):
 
 
 def sym_ce_kl_loss(logit, target):
-  # sym_kl_loss:
-  # Input shape:
-  #   logit: [d1, d2, ..., num_labels]
-  #   target: [d1, d2, .... num_labels]
-  #
-  # Output shape:
-  #   [d1 * d2 * ..., 1]
-  loss = tf.reduce_mean(
-    tf.keras.losses.kld(tf.math.log_softmax(logit, axis=-1), tf.math.softmax(target, axis=-1)) + \
-    tf.keras.losses.kld(tf.math.log_softmax(target, axis=-1), tf.math.softmax(logit, axis=-1)),
-    axis=-1
+  return tf.reduce_mean(
+      tf.keras.losses.kld(tf.math.log_softmax(logit, axis=-1),
+                          tf.math.softmax(target, axis=-1)) +
+      tf.keras.losses.kld(tf.math.log_softmax(target, axis=-1),
+                          tf.math.softmax(logit, axis=-1)),
+      axis=-1,
   )
-  return loss
 
 
 def compute_adv_loss(embedding_output, labert_config, input_ids, input_mask,
@@ -412,8 +405,8 @@ class SequenceLabelingProcessor(DataProcessor):
   def _create_examples(self, raw_data, set_type):
     examples = []
     for (i, (words, labels)) in enumerate(raw_data):
-      guid = "%s-%s" % (set_type, i)
-      if set_type == "test" or set_type == "unlabeled":
+      guid = f"{set_type}-{i}"
+      if set_type in ["test", "unlabeled"]:
         labels = None
       examples.append(InputExample(guid=guid, words=words, labels=labels))
     return examples
@@ -423,7 +416,7 @@ class SequenceLabelingProcessor(DataProcessor):
     labels_set = set()
     for example in examples:
       labels_set.update(example.labels)
-    self._labels = [label for label in sorted(labels_set)]
+    self._labels = list(sorted(labels_set))
     return self._labels
 
   def get_num_token_stats(self, data_dir):
@@ -436,25 +429,22 @@ class SequenceLabelingProcessor(DataProcessor):
       examples.extend(self.get_test_examples(data_dir))
     numbers = []
     for example in examples:
-      length = 2
-      for word in example.words:
-        if self.tokenizer:
-          length += len(self.tokenizer.tokenize(word))
-        else:
-          length += len(tokenization.convert_to_unicode(word))
+      length = 2 + sum(
+          len(self.tokenizer.tokenize(word)) if self.
+          tokenizer else len(tokenization.convert_to_unicode(word))
+          for word in example.words)
       numbers.append(length)
 
     numbers = np.array(numbers)
     numbers.sort()
-    token_stats = {
-      "ave": np.mean(numbers),
-      "median": np.median(numbers),
-      "top80": np.percentile(numbers, 80),
-      "top90": np.percentile(numbers, 90),
-      "top95": np.percentile(numbers, 95),
-      "top99": np.percentile(numbers, 99)
+    return {
+        "ave": np.mean(numbers),
+        "median": np.median(numbers),
+        "top80": np.percentile(numbers, 80),
+        "top90": np.percentile(numbers, 90),
+        "top95": np.percentile(numbers, 95),
+        "top99": np.percentile(numbers, 99),
     }
-    return token_stats
 
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
@@ -470,10 +460,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
         label_ids=[0] * max_seq_length,
         label_weights=[0.] * max_seq_length)
 
-  label_map = {}
-  for (i, label) in enumerate(label_list):
-    label_map[label] = i
-
+  label_map = {label: i for i, label in enumerate(label_list)}
   segment_ids, label_positions, label_ids, label_weights = [], [], [], []
   segment_ids.append(0)
   position = 1
@@ -481,11 +468,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   encoding = tokenizer.build_cls_encoding(add_candidate_indices=False)
   covered = {(0, 1)}  # The CLS token
   for i, word in enumerate(example.words):
-    if example.labels is not None:
-      label_id = label_map[example.labels[i]]
-    else:
-      label_id = 0  # dummy id.
-
+    label_id = label_map[example.labels[i]] if example.labels is not None else 0
     encoding_of_a_word = tokenizer.tokenize(word, add_candidate_indices=False)
     last_position = encoding.positions[-1] + encoding.lengths[-1]
 
@@ -558,21 +541,30 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
 
   if ex_index < 3:
     tf.compat.v1.logging.info("*** Example ***")
-    tf.compat.v1.logging.info("guid: %s" % example.guid)
-    tf.compat.v1.logging.info("tokens: %s" % " ".join(
-        [tokenization.printable_text(x) for x in encoding.tokens]))
-    tf.compat.v1.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-    tf.compat.v1.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-    tf.compat.v1.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+    tf.compat.v1.logging.info(f"guid: {example.guid}")
     tf.compat.v1.logging.info(
-      "positional_embeddings_start: %s" % " ".join([str(x) for x in positional_embeddings_start]))
+        f'tokens: {" ".join([tokenization.printable_text(x) for x in encoding.tokens])}'
+    )
     tf.compat.v1.logging.info(
-      "positional_embeddings_end: %s" % " ".join([str(x) for x in positional_embeddings_end]))
-    tf.compat.v1.logging.info("label_positions: %s" % " ".join([str(x) for x in label_positions]))
-    tf.compat.v1.logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
-    tf.compat.v1.logging.info("label_weights: %s" % " ".join([str(x) for x in label_weights]))
+        f'input_ids: {" ".join([str(x) for x in input_ids])}')
+    tf.compat.v1.logging.info(
+        f'input_mask: {" ".join([str(x) for x in input_mask])}')
+    tf.compat.v1.logging.info(
+        f'segment_ids: {" ".join([str(x) for x in segment_ids])}')
+    tf.compat.v1.logging.info(
+        f'positional_embeddings_start: {" ".join([str(x) for x in positional_embeddings_start])}'
+    )
+    tf.compat.v1.logging.info(
+        f'positional_embeddings_end: {" ".join([str(x) for x in positional_embeddings_end])}'
+    )
+    tf.compat.v1.logging.info(
+        f'label_positions: {" ".join([str(x) for x in label_positions])}')
+    tf.compat.v1.logging.info(
+        f'label_ids: {" ".join([str(x) for x in label_ids])}')
+    tf.compat.v1.logging.info(
+        f'label_weights: {" ".join([str(x) for x in label_weights])}')
 
-  feature = InputFeatures(
+  return InputFeatures(
       input_ids=input_ids,
       input_mask=input_mask,
       segment_ids=segment_ids,
@@ -580,8 +572,8 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
       positional_embeddings_end=positional_embeddings_end,
       label_positions=label_positions,
       label_ids=label_ids,
-      label_weights=label_weights)
-  return feature
+      label_weights=label_weights,
+  )
 
 
 def file_based_convert_examples_to_features(
@@ -713,9 +705,7 @@ def create_model(labert_config, is_training, input_ids, input_mask, segment_ids,
 
     logits = tf.matmul(output_layer, output_weights, transpose_b=True)
     logits = tf.nn.bias_add(logits, output_bias)
-    if do_return_model:
-      return logits, model
-    return logits
+    return (logits, model) if do_return_model else logits
 
 
 def model_fn_builder(labert_config, num_labels, init_checkpoint,
@@ -731,7 +721,7 @@ def model_fn_builder(labert_config, num_labels, init_checkpoint,
     if do_log_information:
       tf.compat.v1.logging.info("*** Features ***")
       for name in sorted(features.keys()):
-        tf.compat.v1.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
+        tf.compat.v1.logging.info(f"  name = {name}, shape = {features[name].shape}")
 
     input_ids = features["input_ids"]
     input_mask = features["input_mask"]

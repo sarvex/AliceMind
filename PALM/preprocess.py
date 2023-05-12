@@ -49,7 +49,7 @@ class RobertaData():
 
         return src_subtoken_idxs, tgt_subtoken_idxs, src, tgt
     def preprocess_qg(self, src, tgt, answer, use_bert_basic_tokenizer=False, is_test=False):
-        text = answer + " " + self.sep_token + src
+        text = f"{answer} {self.sep_token}{src}"
         src_subtokens = self.tokenizer.tokenize(answer) + [self.sep_token] + self.tokenizer.tokenize(src)
         if len(src_subtokens) > 508:
             src_subtokens = src_subtokens[:508]
@@ -96,39 +96,33 @@ class ZhBertData():
 
 def format_to_qg(args):
     zhbert = ZhBertData(args)
-    # if not os.path.exists(args.output_dir):
-    #     os.mkdir(args.output_dir)
-    f_reader = open(args.input_file, 'r')
-    datasets = []
-    for query_id, line in enumerate(f_reader):
-        src, tgt = line.split("\t")
-        src = "".join(src.split(" "))
-        tgt = "".join(tgt.split(" "))
-        src_subtoken_idxs, tgt_subtoken_idxs, src_txt, tgt_txt = zhbert.preprocess(src, tgt)
-        b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
-                       'src_txt': src_txt, "tgt_txt": tgt_txt, "query_id": query_id}
-        datasets.append(b_data_dict)
+    with open(args.input_file, 'r') as f_reader:
+        datasets = []
+        for query_id, line in enumerate(f_reader):
+            src, tgt = line.split("\t")
+            src = "".join(src.split(" "))
+            tgt = "".join(tgt.split(" "))
+            src_subtoken_idxs, tgt_subtoken_idxs, src_txt, tgt_txt = zhbert.preprocess(src, tgt)
+            b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
+                           'src_txt': src_txt, "tgt_txt": tgt_txt, "query_id": query_id}
+            datasets.append(b_data_dict)
 
-    f_reader.close()
     # save_file = pjoin(args.output_dir, args.task+'.'+args.corpus_type+'.0.pt')
     torch.save(datasets, args.output_file)
 
 
 def format_to_squad(args):
     zhbert = RobertaData(args)
-    # if not os.path.exists(args.output_dir):
-    #     os.mkdir(args.output_dir)
-    f_reader = open(args.input_file, 'r')
-    datasets = []
-    for query_id, line in enumerate(f_reader):
-        src, answer = line.split("\t")
+    with open(args.input_file, 'r') as f_reader:
+        datasets = []
         tgt = ""
-        src_subtoken_idxs, tgt_subtoken_idxs, src_txt, tgt_txt = zhbert.preprocess_qg(src, tgt, answer)
-        b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
-                       'src_txt': src_txt, "tgt_txt": tgt_txt, "query_id": query_id}
-        datasets.append(b_data_dict)
+        for query_id, line in enumerate(f_reader):
+            src, answer = line.split("\t")
+            src_subtoken_idxs, tgt_subtoken_idxs, src_txt, tgt_txt = zhbert.preprocess_qg(src, tgt, answer)
+            b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
+                           'src_txt': src_txt, "tgt_txt": tgt_txt, "query_id": query_id}
+            datasets.append(b_data_dict)
 
-    f_reader.close()
     # save_file = pjoin(args.output_dir, args.task+'.'+args.corpus_type+'.0.pt')
     torch.save(datasets, args.output_file)
 

@@ -390,32 +390,34 @@ class TransformerDecoder(nn.Module):
         src_memory_bank = memory_bank
         padding_idx = self.embeddings.padding_idx
         tgt_pad_mask = tgt_words.data.eq(padding_idx).unsqueeze(1) \
-            .expand(tgt_batch, tgt_len, tgt_len)
+                .expand(tgt_batch, tgt_len, tgt_len)
 
-        if (not memory_masks is None):
+        if memory_masks is not None:
             src_len = memory_masks.size(-1)
             src_pad_mask = memory_masks.expand(src_batch, tgt_len, src_len)
 
         else:
             src_pad_mask = src_words.data.eq(padding_idx).unsqueeze(1) \
-                .expand(src_batch, tgt_len, src_len)
+                    .expand(src_batch, tgt_len, src_len)
 
         if state.cache is None:
             saved_inputs = []
         attns = []
         for i in range(self.num_layers):
             prev_layer_input = None
-            if state.cache is None:
-                if state.previous_input is not None:
-                    prev_layer_input = state.previous_layer_inputs[i]
-            output, attn, all_input \
-                = self.transformer_layers[i](
-                    output, src_memory_bank,
-                    src_pad_mask, tgt_pad_mask,
-                    previous_input=prev_layer_input,
-                    layer_cache=state.cache["layer_{}".format(i)]
-                    if state.cache is not None else None,
-                    step=step)
+            if state.cache is None and state.previous_input is not None:
+                prev_layer_input = state.previous_layer_inputs[i]
+            output, attn, all_input = self.transformer_layers[i](
+                output,
+                src_memory_bank,
+                src_pad_mask,
+                tgt_pad_mask,
+                previous_input=prev_layer_input,
+                layer_cache=state.cache[f"layer_{i}"]
+                if state.cache is not None
+                else None,
+                step=step,
+            )
             if state.cache is None:
                 saved_inputs.append(all_input)
             attns.append(attn)
@@ -487,11 +489,11 @@ class TransformerDecoderState(DecoderState):
         for l in range(num_layers):
             layer_cache = {
                 "memory_keys": None,
-                "memory_values": None
+                "memory_values": None,
+                "self_keys": None,
+                "self_values": None,
             }
-            layer_cache["self_keys"] = None
-            layer_cache["self_values"] = None
-            self.cache["layer_{}".format(l)] = layer_cache
+            self.cache[f"layer_{l}"] = layer_cache
 
     def repeat_beam_size_times(self, beam_size):
         """ Repeat beam_size times along batch dimension. """

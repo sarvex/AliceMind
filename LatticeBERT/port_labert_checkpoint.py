@@ -136,7 +136,7 @@ def main():
       continue
     m = re.match("^(.*):\\d+$", name)
     if m is not None:
-      name = m.group(1)
+      name = m[1]
     name_to_variable[name] = var
 
   src_ckpt_vars = tf.train.list_variables(args.init_checkpoint)
@@ -147,7 +147,7 @@ def main():
     if name in ('cls/predictions/output_bias',
                 'bert/embeddings/word_embeddings'):
       fields = name.split('/')
-      fields[0] = fields[0] + '-1'
+      fields[0] = f'{fields[0]}-1'
       new_name = "/".join(fields)
     else:
       new_name = name

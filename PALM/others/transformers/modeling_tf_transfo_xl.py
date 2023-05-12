@@ -88,7 +88,7 @@ class TFPositionwiseFF(tf.keras.layers.Layer):
             core_out = self.drop_2(core_out, training=training)
 
             ##### residual connection
-            output = core_out + inp
+            return core_out + inp
         else:
             ##### positionwise feed-forward
             core_out = self.layer_1(inp)
@@ -97,9 +97,7 @@ class TFPositionwiseFF(tf.keras.layers.Layer):
             core_out = self.drop_2(core_out, training=training)
 
             ##### residual connection + layer normalization
-            output = self.layer_norm(inp + core_out)
-
-        return output
+            return self.layer_norm(inp + core_out)
 
 
 class TFRelPartialLearnableMultiHeadAttn(tf.keras.layers.Layer):
@@ -235,13 +233,7 @@ class TFRelPartialLearnableMultiHeadAttn(tf.keras.layers.Layer):
         attn_out = self.o_net(attn_vec)
         attn_out = self.drop(attn_out, training=training)
 
-        if self.pre_lnorm:
-            ##### residual connection
-            outputs = [w + attn_out]
-        else:
-            ##### residual connection + layer normalization
-            outputs = [self.layer_norm(w + attn_out)]
-
+        outputs = [w + attn_out] if self.pre_lnorm else [self.layer_norm(w + attn_out)]
         if self.output_attentions:
             outputs.append(attn_prob)
 
@@ -277,9 +269,7 @@ class TFRelPartialLearnableDecoderLayer(tf.keras.layers.Layer):
                                       mems, head_mask], training=training)
         ff_output = self.pos_ff(attn_outputs[0], training=training)
 
-        outputs = [ff_output] + attn_outputs[1:]
-
-        return outputs
+        return [ff_output] + attn_outputs[1:]
 
 
 class TFAdaptiveEmbedding(tf.keras.layers.Layer):
@@ -303,44 +293,50 @@ class TFAdaptiveEmbedding(tf.keras.layers.Layer):
         self.emb_projs = []
         if div_val == 1:
             raise NotImplementedError  # Removed these to avoid maintaining dead code - They are not used in our pretrained checkpoint
-        else:
-            for i in range(len(self.cutoffs)):
-                l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i+1]
-                d_emb_i = d_embed // (div_val ** i)
-                self.emb_layers.append(tf.keras.layers.Embedding(r_idx-l_idx,
-                                                                 d_emb_i,
-                                                                 embeddings_initializer=get_initializer(init_std),
-                                                                 name='emb_layers_._{}'.format(i)))
+        for i in range(len(self.cutoffs)):
+            l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i+1]
+            d_emb_i = d_embed // (div_val ** i)
+            self.emb_layers.append(
+                tf.keras.layers.Embedding(
+                    r_idx - l_idx,
+                    d_emb_i,
+                    embeddings_initializer=get_initializer(init_std),
+                    name=f'emb_layers_._{i}',
+                )
+            )
 
     def build(self, input_shape):
         for i in range(len(self.cutoffs)):
             d_emb_i = self.d_embed // (self.div_val ** i)
-            self.emb_projs.append(self.add_weight(shape=(d_emb_i, self.d_proj),
-                                                  initializer=get_initializer(self.init_std),
-                                                  trainable=True,
-                                                  name='emb_projs_._{}'.format(i)))
+            self.emb_projs.append(
+                self.add_weight(
+                    shape=(d_emb_i, self.d_proj),
+                    initializer=get_initializer(self.init_std),
+                    trainable=True,
+                    name=f'emb_projs_._{i}',
+                )
+            )
         super(TFAdaptiveEmbedding, self).build(input_shape)
 
     def call(self, inp):
         if self.div_val == 1:
             raise NotImplementedError  # Removed these to avoid maintaining dead code - They are not used in our pretrained checkpoint
-        else:
-            inp_flat = tf.reshape(inp, (-1,))
-            emb_flat = tf.zeros([shape_list(inp_flat)[0], self.d_proj])
-            for i in range(len(self.cutoffs)):
-                l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
+        inp_flat = tf.reshape(inp, (-1,))
+        emb_flat = tf.zeros([shape_list(inp_flat)[0], self.d_proj])
+        for i in range(len(self.cutoffs)):
+            l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
 
-                mask_i = (inp_flat >= l_idx) & (inp_flat < r_idx)
+            mask_i = (inp_flat >= l_idx) & (inp_flat < r_idx)
 
-                inp_i = tf.boolean_mask(inp_flat, mask_i) - l_idx
-                emb_i = self.emb_layers[i](inp_i)
-                emb_i = tf.einsum('id,de->ie', emb_i, self.emb_projs[i])
+            inp_i = tf.boolean_mask(inp_flat, mask_i) - l_idx
+            emb_i = self.emb_layers[i](inp_i)
+            emb_i = tf.einsum('id,de->ie', emb_i, self.emb_projs[i])
 
-                mask_idx = tf.cast(tf.where(mask_i), dtype=tf.int64)
-                emb_flat += tf.scatter_nd(mask_idx, emb_i, tf.cast(tf.shape(emb_flat), dtype=tf.int64))
+            mask_idx = tf.cast(tf.where(mask_i), dtype=tf.int64)
+            emb_flat += tf.scatter_nd(mask_idx, emb_i, tf.cast(tf.shape(emb_flat), dtype=tf.int64))
 
-            embed_shape = shape_list(inp) + [self.d_proj]
-            embed = tf.reshape(emb_flat, embed_shape)
+        embed_shape = shape_list(inp) + [self.d_proj]
+        embed = tf.reshape(emb_flat, embed_shape)
 
         embed *= self.emb_scale
 
@@ -376,23 +372,30 @@ class TFTransfoXLMainLayer(tf.keras.layers.Layer):
         self.attn_type = config.attn_type
 
         self.layers = []
-        if config.attn_type == 0: # the default attention
-            for i in range(config.n_layer):
-                self.layers.append(
-                    TFRelPartialLearnableDecoderLayer(
-                        config.n_head, config.d_model, config.d_head, config.d_inner, config.dropout,
-                        tgt_len=config.tgt_len, ext_len=config.ext_len, mem_len=config.mem_len,
-                        dropatt=config.dropatt, pre_lnorm=config.pre_lnorm,
-                        r_w_bias=None if self.untie_r else self.r_w_bias,
-                        r_r_bias=None if self.untie_r else self.r_r_bias,
-                        output_attentions=self.output_attentions,
-                        layer_norm_epsilon=config.layer_norm_epsilon,
-                        init_std=config.init_std,
-                        name='layers_._{}'.format(i))
-                )
-        else: # learnable embeddings and absolute embeddings
+        if config.attn_type != 0:
             raise NotImplementedError  # Removed these to avoid maintaining dead code - They are not used in our pretrained checkpoint
 
+        self.layers.extend(
+            TFRelPartialLearnableDecoderLayer(
+                config.n_head,
+                config.d_model,
+                config.d_head,
+                config.d_inner,
+                config.dropout,
+                tgt_len=config.tgt_len,
+                ext_len=config.ext_len,
+                mem_len=config.mem_len,
+                dropatt=config.dropatt,
+                pre_lnorm=config.pre_lnorm,
+                r_w_bias=None if self.untie_r else self.r_w_bias,
+                r_r_bias=None if self.untie_r else self.r_r_bias,
+                output_attentions=self.output_attentions,
+                layer_norm_epsilon=config.layer_norm_epsilon,
+                init_std=config.init_std,
+                name=f'layers_._{i}',
+            )
+            for i in range(config.n_layer)
+        )
         self.same_length = config.same_length
         self.clamp_len = config.clamp_len
 
@@ -428,15 +431,14 @@ class TFTransfoXLMainLayer(tf.keras.layers.Layer):
         raise NotImplementedError
 
     def init_mems(self, data):
-        if self.mem_len > 0:
-            mems = []
-            for i in range(self.n_layer):
-                empty = tf.zeros([self.mem_len, shape_list(data)[1], self.d_model])
-                mems.append(empty)
-
-            return mems
-        else:
+        if self.mem_len <= 0:
             return None
+        mems = []
+        for _ in range(self.n_layer):
+            empty = tf.zeros([self.mem_len, shape_list(data)[1], self.d_model])
+            mems.append(empty)
+
+        return mems
 
     def _update_mems(self, hids, mems, qlen, mlen):
         # does not deal with None
@@ -489,7 +491,7 @@ class TFTransfoXLMainLayer(tf.keras.layers.Layer):
         # attention_probs has shape bsz x n_heads x N x N
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads] (a head_mask for each layer)
         # and head_mask is converted to shape [num_hidden_layers x qlen x klen x bsz x n_head]
-        if not head_mask is None:
+        if head_mask is not None:
             raise NotImplementedError
         else:
             head_mask = [None] * self.n_layer
@@ -524,26 +526,25 @@ class TFTransfoXLMainLayer(tf.keras.layers.Layer):
 
         hids = []
         attentions = []
-        if self.attn_type == 0: # default
-            pos_seq = tf.range(klen-1, -1, -1.0)
-            if self.clamp_len > 0:
-                pos_seq = tf.minimum(pos_seq, self.clamp_len)
-            pos_emb = self.pos_emb(pos_seq)
-
-            core_out = self.drop(word_emb, training=training)
-            pos_emb = self.drop(pos_emb, training=training)
-
-            for i, layer in enumerate(self.layers):
-                hids.append(core_out)
-                mems_i = None if mems is None else mems[i]
-                layer_outputs = layer([core_out, pos_emb, dec_attn_mask,
-                                       mems_i, head_mask[i]], training=training)
-                core_out = layer_outputs[0]
-                if self.output_attentions:
-                    attentions.append(layer_outputs[1])
-        else: # learnable embeddings and absolute embeddings
+        if self.attn_type != 0:
             raise NotImplementedError  # Removed these to avoid maintaining dead code - They are not used in our pretrained checkpoint
 
+        pos_seq = tf.range(klen-1, -1, -1.0)
+        if self.clamp_len > 0:
+            pos_seq = tf.minimum(pos_seq, self.clamp_len)
+        pos_emb = self.pos_emb(pos_seq)
+
+        core_out = self.drop(word_emb, training=training)
+        pos_emb = self.drop(pos_emb, training=training)
+
+        for i, layer in enumerate(self.layers):
+            hids.append(core_out)
+            mems_i = None if mems is None else mems[i]
+            layer_outputs = layer([core_out, pos_emb, dec_attn_mask,
+                                   mems_i, head_mask[i]], training=training)
+            core_out = layer_outputs[0]
+            if self.output_attentions:
+                attentions.append(layer_outputs[1])
         core_out = self.drop(core_out, training=training)
 
         new_mems = self._update_mems(hids, mems, mlen, qlen)
@@ -553,11 +554,11 @@ class TFTransfoXLMainLayer(tf.keras.layers.Layer):
         if self.output_hidden_states:
             # Add last layer and transpose to library standard shape [bsz, len, hidden_dim]
             hids.append(core_out)
-            hids = list(tf.transpose(t, perm=(1, 0, 2)) for t in hids)
+            hids = [tf.transpose(t, perm=(1, 0, 2)) for t in hids]
             outputs.append(hids)
         if self.output_attentions:
             # Transpose to library standard shape [bsz, n_heads, query_seq_len, key_seq_len]
-            attentions = list(tf.transpose(t, perm=(2, 3, 0, 1)) for t in attentions)
+            attentions = [tf.transpose(t, perm=(2, 3, 0, 1)) for t in attentions]
             outputs.append(attentions)
         return outputs  # last hidden state, new_mems, (all hidden states), (all attentions)
 
@@ -664,8 +665,7 @@ class TFTransfoXLModel(TFTransfoXLPreTrainedModel):
         self.transformer = TFTransfoXLMainLayer(config, name='transformer')
 
     def call(self, inputs, **kwargs):
-        outputs = self.transformer(inputs, **kwargs)
-        return outputs
+        return self.transformer(inputs, **kwargs)
 
 
 @add_start_docstrings("""The Transformer-XL Model with a language modeling head on top
@@ -744,10 +744,6 @@ class TFTransfoXLLMHeadModel(TFTransfoXLPreTrainedModel):
         outputs = transformer_outputs[1:]
         if self.sample_softmax > 0 and training:
             raise NotImplementedError
-        else:
-            # pred_hid = tf.reshape(pred_hid, (-1, shape_list(pred_hid)[-1]))
-            softmax_output = self.crit([pred_hid, labels], training=training)
-            # softmax_output = tf.reshape(softmax_output, (bsz, tgt_len, -1))
-            outputs = [softmax_output] + outputs
-
-        return outputs  # logits, new_mems, (all hidden states), (all attentions)
+        # pred_hid = tf.reshape(pred_hid, (-1, shape_list(pred_hid)[-1]))
+        softmax_output = self.crit([pred_hid, labels], training=training)
+        return [softmax_output] + outputs

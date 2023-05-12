@@ -123,11 +123,18 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   vocab_words = list(tokenizer.vocab.keys())
   for _ in range(dupe_factor):
     for document_index in range(len(all_documents)):
-      for instance in create_instances_from_document(all_documents, document_index,
-                                                     max_seq_length, short_seq_prob,
-                                                     masked_lm_prob, max_predictions_per_seq, next_sentence_type,
-                                                     vocab_words, rng, tokenizer):
-        yield instance
+      yield from create_instances_from_document(
+          all_documents,
+          document_index,
+          max_seq_length,
+          short_seq_prob,
+          masked_lm_prob,
+          max_predictions_per_seq,
+          next_sentence_type,
+          vocab_words,
+          rng,
+          tokenizer,
+      )
 
 
 def create_instances_from_document(
@@ -202,19 +209,16 @@ def create_instances_from_document(
           # they don't go to waste.
           num_unused_segments = len(current_chunk) - a_end
           i -= num_unused_segments
-        # Actual next
         else:
           for j in range(a_end, len(current_chunk)):
             encoding_b.extend(current_chunk[j])
 
-          if next_sentence_type == 2:
+          if (next_sentence_type != 2 and rng.random() < 0.5
+              or next_sentence_type == 2):
             next_sentence_label = 1
           else:
-            if rng.random() < 0.5:
-              next_sentence_label = 1
-            else:
-              encoding_a, encoding_b = encoding_b, encoding_a
-              next_sentence_label = 2
+            encoding_a, encoding_b = encoding_b, encoding_a
+            next_sentence_label = 2
 
         truncate_seq_pair(encoding_a, encoding_b, max_num_tokens, rng)
         assert len(encoding_a.tokens) >= 1
@@ -265,8 +269,8 @@ def create_masked_lm_predictions(encodings, masked_lm_prob,
 
   masked_lms = []
   covered_indexes = set()
+  span_length = 1
   for _ in cand_indexes:
-    span_length = 1
     start_position = np.random.choice(len(cand_indexes), size=1)[0]
 
     length = 0
@@ -298,13 +302,10 @@ def create_masked_lm_predictions(encodings, masked_lm_prob,
         # 80% of the time, replace with [MASK]
         if rng.random() < 0.8:
           masked_token = "[MASK]"
+        elif rng.random() < 0.5:
+          masked_token = encodings.tokens[index]
         else:
-          # 10% of the time, keep original
-          if rng.random() < 0.5:
-            masked_token = encodings.tokens[index]
-          # 10% of the time, replace with random word
-          else:
-            masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
+          masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
 
         masked_lms.append(MaskedLmInstance(index=index, label=encodings.tokens[index]))
         encodings.tokens[index] = masked_token

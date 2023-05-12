@@ -151,8 +151,7 @@ class TFAttention(tf.keras.layers.Layer):
         a = self.c_proj(a)
         a = self.resid_dropout(a, training=training)
 
-        outputs = [a] + attn_outputs[1:]
-        return outputs  # a, (attentions)
+        return [a] + attn_outputs[1:]
 
 
 class TFMLP(tf.keras.layers.Layer):
@@ -190,8 +189,7 @@ class TFBlock(tf.keras.layers.Layer):
         m = self.mlp(n, training=training)
         h = self.ln_2(n + m)
 
-        outputs = [h] + output_attn[1:]
-        return outputs  # x, (attentions)
+        return [h] + output_attn[1:]
 
 
 class TFOpenAIGPTMainLayer(tf.keras.layers.Layer):
@@ -212,10 +210,10 @@ class TFOpenAIGPTMainLayer(tf.keras.layers.Layer):
                                                          embeddings_initializer=get_initializer(config.initializer_range),
                                                          name='positions_embed')
         self.drop = tf.keras.layers.Dropout(config.embd_pdrop)
-        self.h = [TFBlock(config.n_ctx,
-                          config,
-                          scale=True,
-                          name='h_._{}'.format(i)) for i in range(config.n_layer)]
+        self.h = [
+            TFBlock(config.n_ctx, config, scale=True, name=f'h_._{i}')
+            for i in range(config.n_layer)
+        ]
 
     def _resize_token_embeddings(self, new_num_tokens):
         raise NotImplementedError
@@ -271,7 +269,7 @@ class TFOpenAIGPTMainLayer(tf.keras.layers.Layer):
         # attention_probs has shape bsz x n_heads x N x N
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
-        if not head_mask is None:
+        if head_mask is not None:
             raise NotImplementedError
         else:
             head_mask = [None] * self.num_hidden_layers
@@ -423,8 +421,7 @@ class TFOpenAIGPTModel(TFOpenAIGPTPreTrainedModel):
         self.transformer = TFOpenAIGPTMainLayer(config, name='transformer')
 
     def call(self, inputs, **kwargs):
-        outputs = self.transformer(inputs, **kwargs)
-        return outputs
+        return self.transformer(inputs, **kwargs)
 
 
 @add_start_docstrings("""OpenAI GPT Model transformer with a language modeling head on top
@@ -464,9 +461,7 @@ class TFOpenAIGPTLMHeadModel(TFOpenAIGPTPreTrainedModel):
 
         lm_logits = self.transformer.tokens_embed(hidden_states, mode="linear")
 
-        outputs = (lm_logits,) + transformer_outputs[1:]
-
-        return outputs  # lm_logits, (all hidden_states), (attentions)
+        return (lm_logits,) + transformer_outputs[1:]
 
 
 @add_start_docstrings("""OpenAI GPT Model transformer with a language modeling and a multiple-choice classification
@@ -561,6 +556,4 @@ class TFOpenAIGPTDoubleHeadsModel(TFOpenAIGPTPreTrainedModel):
 
         mc_logits = tf.squeeze(mc_logits, axis=-1)
 
-        outputs = (lm_logits, mc_logits) + transformer_outputs[1:]
-
-        return outputs  # lm logits, mc logits, (all hidden_states), (attentions)
+        return (lm_logits, mc_logits) + transformer_outputs[1:]

@@ -44,10 +44,14 @@ def convert_tf_weight_name_to_pt_weight_name(tf_name, start_prefix_to_remove='')
     tf_name = tf_name[1:]                                     # Remove level zero
 
     # When should we transpose the weights
-    transpose = bool(tf_name[-1] == 'kernel' or 'emb_projs' in tf_name or 'out_projs' in tf_name)
+    transpose = (
+        tf_name[-1] == 'kernel'
+        or 'emb_projs' in tf_name
+        or 'out_projs' in tf_name
+    )
 
     # Convert standard TF2.0 names in PyTorch names
-    if tf_name[-1] == 'kernel' or tf_name[-1] == 'embeddings' or tf_name[-1] == 'gamma':
+    if tf_name[-1] in ['kernel', 'embeddings', 'gamma']:
         tf_name[-1] = 'weight'
     if tf_name[-1] == 'beta':
         tf_name[-1] = 'bias'
@@ -75,7 +79,7 @@ def load_pytorch_checkpoint_in_tf2_model(tf_model, pytorch_checkpoint_path, tf_i
         raise e
 
     pt_path = os.path.abspath(pytorch_checkpoint_path)
-    logger.info("Loading PyTorch weights from {}".format(pt_path))
+    logger.info(f"Loading PyTorch weights from {pt_path}")
 
     pt_state_dict = torch.load(pt_path, map_location='cpu')
 
@@ -128,7 +132,7 @@ def load_pytorch_weights_in_tf2_model(tf_model, pt_state_dict, tf_inputs=None, a
     # TF models always have a prefix, some of PyTorch models (base ones) don't
     start_prefix_to_remove = ''
     if not any(s.startswith(tf_model.base_model_prefix) for s in pt_state_dict.keys()):
-        start_prefix_to_remove = tf_model.base_model_prefix + '.'
+        start_prefix_to_remove = f'{tf_model.base_model_prefix}.'
 
     symbolic_weights = tf_model.trainable_weights + tf_model.non_trainable_weights
 
@@ -139,7 +143,7 @@ def load_pytorch_weights_in_tf2_model(tf_model, pt_state_dict, tf_inputs=None, a
         name, transpose = convert_tf_weight_name_to_pt_weight_name(sw_name, start_prefix_to_remove=start_prefix_to_remove)
 
         # Find associated numpy array in pytorch model state dict
-        assert name in pt_state_dict, "{} not found in PyTorch model".format(name)
+        assert name in pt_state_dict, f"{name} not found in PyTorch model"
         array = pt_state_dict[name].numpy()
 
         if transpose:
@@ -156,7 +160,7 @@ def load_pytorch_weights_in_tf2_model(tf_model, pt_state_dict, tf_inputs=None, a
             e.args += (symbolic_weight.shape, array.shape)
             raise e
 
-        logger.info("Initialize TF weight {}".format(symbolic_weight.name))
+        logger.info(f"Initialize TF weight {symbolic_weight.name}")
 
         weight_value_tuples.append((symbolic_weight, array))
         all_pytorch_weights.discard(name)
@@ -166,7 +170,9 @@ def load_pytorch_weights_in_tf2_model(tf_model, pt_state_dict, tf_inputs=None, a
     if tf_inputs is not None:
         tfo = tf_model(tf_inputs, training=False)  # Make sure restore ops are run
 
-    logger.info("Weights or buffers not loaded from PyTorch model: {}".format(all_pytorch_weights))
+    logger.info(
+        f"Weights or buffers not loaded from PyTorch model: {all_pytorch_weights}"
+    )
 
     return tf_model
 
@@ -190,10 +196,10 @@ def load_tf2_checkpoint_in_pytorch_model(pt_model, tf_checkpoint_path, tf_inputs
     import transformers
 
     tf_path = os.path.abspath(tf_checkpoint_path)
-    logger.info("Loading TensorFlow weights from {}".format(tf_checkpoint_path))
+    logger.info(f"Loading TensorFlow weights from {tf_checkpoint_path}")
 
     # Instantiate and load the associated TF 2.0 model
-    tf_model_class_name = "TF" + pt_model.__class__.__name__  # Add "TF" at the beggining
+    tf_model_class_name = f"TF{pt_model.__class__.__name__}"
     tf_model_class = getattr(transformers, tf_model_class_name)
     tf_model = tf_model_class(pt_model.config)
 
@@ -232,8 +238,11 @@ def load_tf2_weights_in_pytorch_model(pt_model, tf_weights, allow_missing_keys=F
     # Make sure we are able to load PyTorch base models as well as derived models (with heads)
     # TF models always have a prefix, some of PyTorch models (base ones) don't
     start_prefix_to_remove = ''
-    if not any(s.startswith(pt_model.base_model_prefix) for s in current_pt_params_dict.keys()):
-        start_prefix_to_remove = pt_model.base_model_prefix + '.'
+    if not any(
+        s.startswith(pt_model.base_model_prefix)
+        for s in current_pt_params_dict
+    ):
+        start_prefix_to_remove = f'{pt_model.base_model_prefix}.'
 
     # Build a map from potential PyTorch weight names to TF 2.0 Variables
     tf_weights_map = {}
@@ -251,7 +260,7 @@ def load_tf2_weights_in_pytorch_model(pt_model, tf_weights, allow_missing_keys=F
 
         # Find associated numpy array in pytorch model state dict
         if pt_weight_name not in tf_weights_map:
-            raise ValueError("{} not found in TF 2.0 model".format(pt_weight_name))
+            raise ValueError(f"{pt_weight_name} not found in TF 2.0 model")
 
         array, transpose = tf_weights_map[pt_weight_name]
 
@@ -269,7 +278,7 @@ def load_tf2_weights_in_pytorch_model(pt_model, tf_weights, allow_missing_keys=F
             e.args += (pt_weight.shape, array.shape)
             raise e
 
-        logger.info("Initialize PyTorch weight {}".format(pt_weight_name))
+        logger.info(f"Initialize PyTorch weight {pt_weight_name}")
 
         new_pt_params_dict[pt_weight_name] = torch.from_numpy(array)
         loaded_pt_weights_data_ptr[pt_weight.data_ptr()] = torch.from_numpy(array)
@@ -278,12 +287,16 @@ def load_tf2_weights_in_pytorch_model(pt_model, tf_weights, allow_missing_keys=F
     missing_keys, unexpected_keys = pt_model.load_state_dict(new_pt_params_dict, strict=False)
 
     if len(missing_keys) > 0:
-        logger.info("Weights of {} not initialized from TF 2.0 model: {}".format(
-            pt_model.__class__.__name__, missing_keys))
+        logger.info(
+            f"Weights of {pt_model.__class__.__name__} not initialized from TF 2.0 model: {missing_keys}"
+        )
     if len(unexpected_keys) > 0:
-        logger.info("Weights from TF 2.0 model not used in {}: {}".format(
-            pt_model.__class__.__name__, unexpected_keys))
+        logger.info(
+            f"Weights from TF 2.0 model not used in {pt_model.__class__.__name__}: {unexpected_keys}"
+        )
 
-    logger.info("Weights or buffers not loaded from TF 2.0 model: {}".format(all_tf_weights))
+    logger.info(
+        f"Weights or buffers not loaded from TF 2.0 model: {all_tf_weights}"
+    )
 
     return pt_model

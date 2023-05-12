@@ -20,8 +20,9 @@ from translate.beam import GNMTGlobalScorer
 def build_predictor(args, tokenizer, symbols, model, logger=None):
     scorer = GNMTGlobalScorer(args.alpha,length_penalty='wu')
 
-    translator = Translator(args, model, tokenizer, symbols, global_scorer=scorer, logger=logger)
-    return translator
+    return Translator(
+        args, model, tokenizer, symbols, global_scorer=scorer, logger=logger
+    )
 
 
 class Translator(object):
@@ -95,8 +96,7 @@ class Translator(object):
                 tokens = tokens[:-1]
                 break
         tokens = [t for t in tokens if t < len(self.vocab)]
-        tokens = self.vocab.DecodeIds(tokens).split(' ')
-        return tokens
+        return self.vocab.DecodeIds(tokens).split(' ')
 
     def from_batch(self, translation_batch):
         batch = translation_batch["batch"]
@@ -160,7 +160,7 @@ class Translator(object):
         can_path = self.args.result_path + '.%d.candidate' % step
         self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
         self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
-        self.pred_json_score_out_file = codecs.open(can_path+'.sample', 'w', 'utf-8')
+        self.pred_json_score_out_file = codecs.open(f'{can_path}.sample', 'w', 'utf-8')
         if self.args.dataset == 'paraphrase' and self.args.encoder == "roberta":
             self.pred_json_score_out_file.write("\t".join(["query_id", "source_query", "target_query", "predict_query"])+"\n")
 
@@ -184,11 +184,11 @@ class Translator(object):
                         pred_str = pred.replace('[unused0]', '').replace('[PAD]', '').replace('[unused1]', '').replace(r' +', ' ').replace('[SEP]', '').replace('[unused2]', '').strip()
                         pred_str = pred_str.replace(r' +', ' ').replace('<mask>', '<q>').replace('<pad>', '').replace('<s>', '').replace('</s>', '').replace('<unk>', '').strip()
                     gold_str = gold.replace('<mask>', '<q>').strip().replace('UNK', '').replace('[unused1]', '').replace('[unused2]', '').replace('##', '').replace('<unk>', '')
-                    if(self.args.recall_eval):
+                    if self.args.recall_eval:
                         _pred_str = ''
                         gap = 1e3
                         for sent in pred_str.split('<q>'):
-                            can_pred_str = _pred_str+ '<q>'+sent.strip()
+                            can_pred_str = f'{_pred_str}<q>{sent.strip()}'
                             can_gap = math.fabs(len(_pred_str.split())-len(gold_str.split()))
                             # if(can_gap>=gap):
                             if(len(can_pred_str.split())>=len(gold_str.split())+10):
@@ -199,16 +199,16 @@ class Translator(object):
                                 _pred_str = can_pred_str
 
 
-                    if self.args.dataset == "marco" or self.args.dataset == "squad" or self.args.dataset == "qg_ranking":
+                    if self.args.dataset in ["marco", "squad", "qg_ranking"]:
                         pred_str = pred_str.replace('<q>', ' ')
-                        if query_id != None:
-                            pred_json = {'query_id':query_id, 'answers':[pred_str]}
-                            gold_json = {'query_id':query_id, 'answers':[gold_str]}
-                            pred_json_score = {'query_id':query_id, 'answers':[pred_str], 'scores':pred_score[0].cpu().numpy().tolist()}
-                        else:
+                        if query_id is None:
                             pred_json = {'query_id':cnt, 'answers':[pred_str]}
                             gold_json = {'query_id':cnt, 'answers':[gold_str]}
                             pred_json_score = {'query_id':cnt, 'answers':[pred_str], 'scores':pred_score[0].cpu().numpy().tolist()}
+                        else:
+                            pred_json = {'query_id':query_id, 'answers':[pred_str]}
+                            gold_json = {'query_id':query_id, 'answers':[gold_str]}
+                            pred_json_score = {'query_id':query_id, 'answers':[pred_str], 'scores':pred_score[0].cpu().numpy().tolist()}
                         json.dump(pred_json, self.can_out_file)
                         self.can_out_file.write('\n')
                         json.dump(gold_json, self.gold_out_file)
@@ -229,19 +229,19 @@ class Translator(object):
                         self.pred_json_score_out_file.write("\t".join([str(query_id), gold_str, src, pred_str, str(pred_score[0].cpu().numpy().tolist())])+"\n")
                     elif self.args.dataset == "qg_ranking_test":
                         self.can_out_file.write(str(query_id)+'\t'+pred_str+'\n') 
-                     
+
                     cnt += 1
                 self.can_out_file.flush()
                 self.gold_out_file.flush()
                 self.src_out_file.flush()
-        self.logger.info("cnt: %s" % cnt)
+        self.logger.info(f"cnt: {cnt}")
         self.can_out_file.close()
         self.gold_out_file.close()
         self.src_out_file.close()
 
         if (step != -1):
-            if self.args.dataset == "marco" or self.args.dataset == "squad" or self.args.dataset == "qg_ranking":
-                cnn_results = subprocess.getoutput("./run.sh %s %s" % (gold_path, can_path))
+            if self.args.dataset in ["marco", "squad", "qg_ranking"]:
+                cnn_results = subprocess.getoutput(f"./run.sh {gold_path} {can_path}")
                 self.logger.info(cnn_results)
             elif self.args.dataset == "cnn":
                 rouges = self._report_rouge(gold_path, can_path)
@@ -253,8 +253,7 @@ class Translator(object):
 
     def _report_rouge(self, gold_path, can_path):
         self.logger.info("Calculating Rouge")
-        results_dict = test_rouge(self.args.temp_dir, can_path, gold_path)
-        return results_dict
+        return test_rouge(self.args.temp_dir, can_path, gold_path)
 
     def translate_batch(self, batch, fast=False):
         """

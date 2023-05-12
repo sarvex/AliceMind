@@ -14,8 +14,7 @@ class Batch(object):
     def _pad(self, data, pad_id, width=-1):
         if (width == -1):
             width = max(len(d) for d in data)
-        rtn_data = [d + [pad_id] * (width - len(d)) for d in data]
-        return rtn_data
+        return [d + [pad_id] * (width - len(d)) for d in data]
 
     def __init__(self, data=None, device=None, is_test=False, encoder='bert', max_src=-1):
         """Create a Batch from a list of examples."""
@@ -72,7 +71,7 @@ def load_dataset(args, corpus_type, shuffle):
         return dataset
 
     # Sort the glob output by file name (by increasing indexes).
-    pts = sorted(glob.glob(args.data_path + '.' + corpus_type + '.[0-9]*.pt'))
+    pts = sorted(glob.glob(f'{args.data_path}.{corpus_type}.[0-9]*.pt'))
     if (shuffle):
         random.shuffle(pts)
     for pt in pts:
@@ -90,14 +89,10 @@ def abs_batch_size_fn(new, count):
     #max_n_sents = max(max_n_sents, 10)
     max_size = max(max_size, max_n_sents)
     src_elements = count * max_size
-    if (count > 6):
-        return src_elements + 1e3
-    return src_elements
+    return src_elements + 1e3 if (count > 6) else src_elements
 
 
 def ext_batch_size_fn(new, count):
-    if (len(new) == 4):
-        pass
     src, labels = new[0], new[4]
     global max_n_sents, max_n_tokens, max_size
     if count == 1:
@@ -106,8 +101,7 @@ def ext_batch_size_fn(new, count):
         max_n_tokens = 0
     max_n_sents = max(max_n_sents, len(src))
     max_size = max(max_size, max_n_sents)
-    src_elements = count * max_size
-    return src_elements
+    return count * max_size
 
 
 class Dataloader(object):
@@ -123,10 +117,9 @@ class Dataloader(object):
         assert self.cur_iter is not None
 
     def __iter__(self):
-        dataset_iter = (d for d in self.datasets)
+        dataset_iter = iter(self.datasets)
         while self.cur_iter is not None:
-            for batch in self.cur_iter:
-                yield batch
+            yield from self.cur_iter
             self.cur_iter = self._next_dataset_iterator(dataset_iter)
 
 
@@ -168,8 +161,7 @@ class DataIterator(object):
     def data(self):
         if self.shuffle:
             random.shuffle(self.dataset)
-        xs = self.dataset
-        return xs
+        return self.dataset
 
 
 
@@ -181,24 +173,16 @@ class DataIterator(object):
         tgt = ex['tgt']
         tgt_end_id = [tgt[-1]]
         tgt = tgt[:self.args.max_tgt_len][:-1]+tgt_end_id
-        
-        src_txt = ex['src_txt']
-        tgt_txt = ex['tgt_txt']
 
         end_id = [src[-1]]
         src = src[:-1][:self.args.max_pos - 1] + end_id
-        # src_txt = src_txt[:max_sent_id]
-
-
-
-        if(is_test):
-            try:
-                query_id = ex['query_id']
-            except:
-                query_id = None
-            return src, tgt, query_id, src_txt, tgt_txt
-        else:
+        if not is_test:
             return src, tgt
+        try:
+            query_id = ex['query_id']
+        except:
+            query_id = None
+        return src, tgt, query_id, ex['src_txt'], ex['tgt_txt']
 
     def batch_buffer(self, data, batch_size):
         minibatch, size_so_far = [], 0
@@ -271,7 +255,11 @@ class DataIterator(object):
                     continue
                 self.iterations += 1
                 self._iterations_this_epoch += 1
-                batch = Batch(minibatch, self.device, self.is_test, self.args.encoder, self.args.max_src)
-
-                yield batch
+                yield Batch(
+                    minibatch,
+                    self.device,
+                    self.is_test,
+                    self.args.encoder,
+                    self.args.max_src,
+                )
             return

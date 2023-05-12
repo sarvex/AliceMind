@@ -148,9 +148,9 @@ class TFAutoModel(object):
         elif 'xlm' in pretrained_model_name_or_path:
             return TFXLMModel.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', "
-                         "'xlm', 'roberta'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', 'xlm', 'roberta'"
+        )
 
 
 class TFAutoModelWithLMHead(object):
@@ -272,9 +272,9 @@ class TFAutoModelWithLMHead(object):
         elif 'xlm' in pretrained_model_name_or_path:
             return TFXLMWithLMHeadModel.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', "
-                         "'xlm', 'roberta'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'openai-gpt', 'gpt2', 'transfo-xl', 'xlnet', 'xlm', 'roberta'"
+        )
 
 
 class TFAutoModelForSequenceClassification(object):
@@ -387,8 +387,9 @@ class TFAutoModelForSequenceClassification(object):
         elif 'xlm' in pretrained_model_name_or_path:
             return TFXLMForSequenceClassification.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'xlnet', 'xlm', 'roberta'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'xlnet', 'xlm', 'roberta'"
+        )
 
 
 class TFAutoModelForQuestionAnswering(object):
@@ -497,5 +498,6 @@ class TFAutoModelForQuestionAnswering(object):
         elif 'xlm' in pretrained_model_name_or_path:
             return TFXLMForQuestionAnsweringSimple.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        raise ValueError("Unrecognized model identifier in {}. Should contains one of "
-                         "'bert', 'xlnet', 'xlm'".format(pretrained_model_name_or_path))
+        raise ValueError(
+            f"Unrecognized model identifier in {pretrained_model_name_or_path}. Should contains one of 'bert', 'xlnet', 'xlm'"
+        )

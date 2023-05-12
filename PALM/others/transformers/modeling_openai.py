@@ -48,12 +48,27 @@ def load_tf_weights_in_openai_gpt(model, config, openai_checkpoint_folder_path):
     if '.ckpt' in openai_checkpoint_folder_path:
         openai_checkpoint_folder_path = os.path.dirname(openai_checkpoint_folder_path)
 
-    logger.info("Loading weights from {}".format(openai_checkpoint_folder_path))
+    logger.info(f"Loading weights from {openai_checkpoint_folder_path}")
 
-    names = json.load(open(openai_checkpoint_folder_path + '/parameters_names.json', "r", encoding='utf-8'))
-    shapes = json.load(open(openai_checkpoint_folder_path + '/params_shapes.json', "r", encoding='utf-8'))
+    names = json.load(
+        open(
+            f'{openai_checkpoint_folder_path}/parameters_names.json',
+            "r",
+            encoding='utf-8',
+        )
+    )
+    shapes = json.load(
+        open(
+            f'{openai_checkpoint_folder_path}/params_shapes.json',
+            "r",
+            encoding='utf-8',
+        )
+    )
     offsets = np.cumsum([np.prod(shape) for shape in shapes])
-    init_params = [np.load(openai_checkpoint_folder_path + '/params_{}.npy'.format(n)) for n in range(10)]
+    init_params = [
+        np.load(f'{openai_checkpoint_folder_path}/params_{n}.npy')
+        for n in range(10)
+    ]
     init_params = np.split(np.concatenate(init_params, 0), offsets)[:-1]
     init_params = [param.reshape(shape) for param, shape in zip(init_params, shapes)]
 
@@ -88,12 +103,10 @@ def load_tf_weights_in_openai_gpt(model, config, openai_checkpoint_folder_path):
                 l = re.split(r'(\d+)', m_name)
             else:
                 l = [m_name]
-            if l[0] == 'g':
+            if l[0] == 'g' or l[0] != 'b' and l[0] == 'w':
                 pointer = getattr(pointer, 'weight')
             elif l[0] == 'b':
                 pointer = getattr(pointer, 'bias')
-            elif l[0] == 'w':
-                pointer = getattr(pointer, 'weight')
             else:
                 pointer = getattr(pointer, l[0])
             if len(l) >= 2:
@@ -109,7 +122,7 @@ def load_tf_weights_in_openai_gpt(model, config, openai_checkpoint_folder_path):
         except AssertionError as e:
             e.args += (pointer.shape, array.shape)
             raise
-        logger.info("Initialize PyTorch weight {}".format(name))
+        logger.info(f"Initialize PyTorch weight {name}")
         pointer.data = torch.from_numpy(array)
     return model
 
@@ -196,10 +209,7 @@ class Attention(nn.Module):
     def split_heads(self, x, k=False):
         new_x_shape = x.size()[:-1] + (self.n_head, x.size(-1) // self.n_head)
         x = x.view(*new_x_shape)  # in Tensorflow implem: fct split_states
-        if k:
-            return x.permute(0, 2, 3, 1)
-        else:
-            return x.permute(0, 2, 1, 3)
+        return x.permute(0, 2, 3, 1) if k else x.permute(0, 2, 1, 3)
 
     def forward(self, x, attention_mask=None, head_mask=None):
         x = self.c_attn(x)
@@ -215,8 +225,7 @@ class Attention(nn.Module):
         a = self.c_proj(a)
         a = self.resid_dropout(a)
 
-        outputs = [a] + attn_outputs[1:]
-        return outputs  # a, (attentions)
+        return [a] + attn_outputs[1:]
 
 
 class MLP(nn.Module):
@@ -251,8 +260,7 @@ class Block(nn.Module):
         m = self.mlp(n)
         h = self.ln_2(n + m)
 
-        outputs = [h] + attn_outputs[1:]
-        return outputs
+        return [h] + attn_outputs[1:]
 
 
 class OpenAIGPTPreTrainedModel(PreTrainedModel):

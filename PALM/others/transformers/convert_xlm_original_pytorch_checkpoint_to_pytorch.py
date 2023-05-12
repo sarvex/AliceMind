@@ -41,27 +41,36 @@ def convert_xlm_checkpoint_to_pytorch(xlm_checkpoint_path, pytorch_dump_folder_p
         if 'pred_layer' in k:
             two_levels_state_dict[k] = v
         else:
-            two_levels_state_dict['transformer.' + k] = v
+            two_levels_state_dict[f'transformer.{k}'] = v
 
     config = chkpt['params']
-    config = dict((n, v) for n, v in config.items() if not isinstance(v, (torch.FloatTensor, numpy.ndarray)))
+    config = {
+        n: v
+        for n, v in config.items()
+        if not isinstance(v, (torch.FloatTensor, numpy.ndarray))
+    }
 
     vocab = chkpt['dico_word2id']
-    vocab = dict((s + '</w>' if s.find('@@') == -1 and i > 13 else s.replace('@@', ''), i) for s, i in vocab.items())
+    vocab = {
+        f'{s}</w>' if s.find('@@') == -1 and i > 13 else s.replace('@@', ''): i
+        for s, i in vocab.items()
+    }
 
     # Save pytorch-model
-    pytorch_weights_dump_path = pytorch_dump_folder_path + '/' + WEIGHTS_NAME
-    pytorch_config_dump_path = pytorch_dump_folder_path + '/' + CONFIG_NAME
-    pytorch_vocab_dump_path = pytorch_dump_folder_path + '/' +  VOCAB_FILES_NAMES['vocab_file']
+    pytorch_weights_dump_path = f'{pytorch_dump_folder_path}/{WEIGHTS_NAME}'
+    pytorch_config_dump_path = f'{pytorch_dump_folder_path}/{CONFIG_NAME}'
+    pytorch_vocab_dump_path = (
+        f'{pytorch_dump_folder_path}/' + VOCAB_FILES_NAMES['vocab_file']
+    )
 
-    print("Save PyTorch model to {}".format(pytorch_weights_dump_path))
+    print(f"Save PyTorch model to {pytorch_weights_dump_path}")
     torch.save(two_levels_state_dict, pytorch_weights_dump_path)
 
-    print("Save configuration file to {}".format(pytorch_config_dump_path))
+    print(f"Save configuration file to {pytorch_config_dump_path}")
     with open(pytorch_config_dump_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(config, indent=2) + "\n")
 
-    print("Save vocab file to {}".format(pytorch_config_dump_path))
+    print(f"Save vocab file to {pytorch_config_dump_path}")
     with open(pytorch_vocab_dump_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(vocab, indent=2) + "\n")
 
